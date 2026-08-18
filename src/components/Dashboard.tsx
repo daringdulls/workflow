@@ -210,7 +210,7 @@ export default function Dashboard() {
               </p>
             </div>
             <span
-              className={`hidden sm:inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${heroMeta.tintBg} ${heroMeta.tintText}`}
+              className={`hidden sm:inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${heroMeta.chipBg} ${heroMeta.chipText}`}
             >
               <span className={`h-1.5 w-1.5 rounded-full ${heroMeta.accentBg}`} />
               Live workspace

@@ -6,9 +6,11 @@ export const PROFILE_META: Record<
     label: string;
     accent: string; // solid brand color, e.g. text-hotel
     accentBg: string; // solid bg, e.g. bg-hotel
-    tintBg: string; // pale tint background for active nav row
-    tintText: string; // darker tint text for active nav row
+    tintBg: string; // pale tint background for active nav row (dark sidebar only)
+    tintText: string; // darker tint text for active nav row (dark sidebar only)
     ring: string;
+    chipBg: string; // pale tint background for badges/pills on a LIGHT surface
+    chipText: string; // readable text color for badges/pills on a LIGHT surface
   }
 > = {
   all: {
@@ -18,6 +20,8 @@ export const PROFILE_META: Record<
     tintBg: "bg-white/10",
     tintText: "text-white",
     ring: "ring-white/20",
+    chipBg: "bg-slate-100",
+    chipText: "text-slate-700",
   },
   hotel: {
     label: "Hotel Ops",
@@ -26,6 +30,8 @@ export const PROFILE_META: Record<
     tintBg: "bg-hotel/15",
     tintText: "text-hotel-400",
     ring: "ring-hotel/30",
+    chipBg: "bg-hotel-50",
+    chipText: "text-hotel-700",
   },
   design: {
     label: "Graphic Design",
@@ -34,6 +40,8 @@ export const PROFILE_META: Record<
     tintBg: "bg-design/15",
     tintText: "text-design-400",
     ring: "ring-design/30",
+    chipBg: "bg-design-50",
+    chipText: "text-design-700",
   },
   freelance: {
     label: "Freelance",
@@ -42,6 +50,8 @@ export const PROFILE_META: Record<
     tintBg: "bg-freelance/15",
     tintText: "text-freelance-400",
     ring: "ring-freelance/30",
+    chipBg: "bg-freelance-50",
+    chipText: "text-freelance-700",
   },
   general: {
     label: "General",
@@ -50,6 +60,8 @@ export const PROFILE_META: Record<
     tintBg: "bg-white/10",
     tintText: "text-white",
     ring: "ring-white/20",
+    chipBg: "bg-slate-100",
+    chipText: "text-slate-700",
   },
 };
 
