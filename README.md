@@ -12,16 +12,10 @@ One dashboard for all three of your jobs: Hotel Operations / Revenue / F&B, Grap
 
 ## 1. Put this on GitHub
 
+This folder already has a git repo initialized with one commit, so you don't need `git init`. Create an empty repo on GitHub (github.com → New repository, don't initialize it with a README), then from inside the `workflow-app` folder:
+
 ```bash
 cd workflow-app
-git init
-git add .
-git commit -m "Initial WorkFlow dashboard"
-```
-
-Then create an empty repo on GitHub (github.com → New repository, don't initialize with a README), and push:
-
-```bash
 git remote add origin https://github.com/<your-username>/workflow.git
 git branch -M main
 git push -u origin main
