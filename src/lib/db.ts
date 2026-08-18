@@ -1,20 +1,43 @@
-import { neon } from "@neondatabase/serverless";
+import { neon, NeonQueryFunction } from "@neondatabase/serverless";
 
-const connectionString =
-  process.env.DATABASE_URL ||
-  process.env.POSTGRES_URL ||
-  process.env.DATABASE_URL_UNPOOLED ||
-  "";
-
-if (!connectionString) {
-  // Thrown lazily (only when a query actually runs) so `next build` doesn't
-  // fail just because env vars aren't set yet in this environment.
-  console.warn(
-    "No database connection string found. Set DATABASE_URL (or POSTGRES_URL) — see .env.example."
+function getConnectionString() {
+  return (
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_URL ||
+    process.env.DATABASE_URL_UNPOOLED ||
+    ""
   );
 }
 
-export const sql = neon(connectionString);
+// Next.js evaluates every API route module while running `next build` (to
+// collect page data), even though it never actually calls the handlers at
+// that point. If we built the Neon client at module load time, `next build`
+// would crash the moment DATABASE_URL isn't set yet (e.g. your very first
+// deploy, before you've attached the Postgres storage). So we build it lazily
+// on first real query instead — build time never touches it, and by the time
+// a request actually comes in at runtime, Vercel has injected the real env var.
+let client: NeonQueryFunction<false, false> | null = null;
+
+function getClient(): NeonQueryFunction<false, false> {
+  if (!client) {
+    const connectionString = getConnectionString();
+    if (!connectionString) {
+      throw new Error(
+        "No database connection string found. Set DATABASE_URL (or POSTGRES_URL) — see .env.example. " +
+          "If you're on Vercel, attach a Postgres database from the Storage tab and redeploy."
+      );
+    }
+    client = neon(connectionString);
+  }
+  return client;
+}
+
+function sqlTag(strings: TemplateStringsArray, ...values: unknown[]) {
+  return getClient()(strings, ...values);
+}
+sqlTag.query = (text: string, params?: unknown[]) => getClient().query(text, params);
+
+export const sql = sqlTag as unknown as NeonQueryFunction<false, false>;
 
 let schemaReady = false;
 
