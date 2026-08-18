@@ -158,72 +158,126 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-slate-400">
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-400 text-sm">
         Loading your workflow…
       </div>
     );
   }
 
+  const heroMeta = PROFILE_META[scope];
+  const today = new Date();
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200 bg-white sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="font-semibold text-slate-900">WorkFlow</h1>
-            <p className="text-xs text-slate-400">Pixelate MV</p>
+    <div className="min-h-screen bg-[#f6f7f9] lg:flex">
+      {/* Sidebar */}
+      <aside className="lg:w-64 lg:flex-shrink-0 bg-slate-950 lg:min-h-screen lg:sticky lg:top-0 lg:self-start">
+        <div className="flex flex-col h-full lg:h-screen px-4 py-5">
+          <div className="flex items-center gap-2.5 px-2 mb-6">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-hotel via-design to-freelance text-white font-bold text-sm shadow-card">
+              W
+            </span>
+            <div>
+              <p className="text-white font-semibold leading-tight">WorkFlow</p>
+              <p className="text-[11px] text-slate-500 leading-tight">Pixelate MV</p>
+            </div>
           </div>
+
           <ProfileTabs active={scope} onChange={setScope} />
-          <button onClick={logout} className="text-sm text-slate-400 hover:text-slate-700">
-            Log out
-          </button>
+
+          <div className="mt-auto pt-6 border-t border-white/5 flex items-center justify-between px-2">
+            <div>
+              <p className="text-xs text-slate-500">Signed in</p>
+              <p className="text-sm text-slate-300">daringdulls</p>
+            </div>
+            <button
+              onClick={logout}
+              className="text-xs font-medium text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg px-3 py-1.5 transition"
+            >
+              Log out
+            </button>
+          </div>
         </div>
-      </header>
+      </aside>
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
-        <SummaryStrip scope={scope} tasks={tasks} orders={orders} projects={projects} />
-
-        {scope === "all" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <TaskList scope="all" tasks={filteredTasks} onAdd={addTask} onUpdate={updateTask} onDelete={deleteTask} />
-            <Calendar items={calItems} scope="all" onAddEvent={addEvent} />
-          </div>
-        )}
-
-        {scope === "hotel" && (
-          <div className="space-y-6">
-            <AppLauncher profile="hotel" links={filteredLinks} onAdd={addLink} onDelete={deleteLink} />
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <TaskList scope="hotel" tasks={filteredTasks} onAdd={addTask} onUpdate={updateTask} onDelete={deleteTask} />
-              <Calendar items={calItems} scope="hotel" onAddEvent={addEvent} />
+      {/* Main content */}
+      <div className="flex-1 min-w-0">
+        <header className="border-b border-slate-200/70 bg-white/80 backdrop-blur sticky top-0 z-10">
+          <div className="px-4 sm:px-8 py-5 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h1 className="text-xl font-semibold text-slate-900">{heroMeta.label}</h1>
+              <p className="text-sm text-slate-400">
+                {today.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
+              </p>
             </div>
+            <span
+              className={`hidden sm:inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${heroMeta.tintBg} ${heroMeta.tintText}`}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${heroMeta.accentBg}`} />
+              Live workspace
+            </span>
           </div>
-        )}
+        </header>
 
-        {scope === "design" && (
-          <div className="space-y-6">
-            <AppLauncher profile="design" links={filteredLinks} onAdd={addLink} onDelete={deleteLink} />
-            <DesignBoard orders={orders} onAdd={addOrder} onUpdate={updateOrder} onDelete={deleteOrder} />
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <TaskList scope="design" tasks={filteredTasks} onAdd={addTask} onUpdate={updateTask} onDelete={deleteTask} />
-              <Calendar items={calItems} scope="design" onAddEvent={addEvent} />
-            </div>
-          </div>
-        )}
+        <main className="px-4 sm:px-8 py-6 space-y-6 max-w-6xl">
+          <SummaryStrip scope={scope} tasks={tasks} orders={orders} projects={projects} />
 
-        {scope === "freelance" && (
-          <div className="space-y-6">
-            <AppLauncher profile="freelance" links={filteredLinks} onAdd={addLink} onDelete={deleteLink} />
-            <FreelanceTracker projects={projects} onAdd={addProject} onUpdate={updateProject} onDelete={deleteProject} />
+          {scope === "all" && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <TaskList scope="freelance" tasks={filteredTasks} onAdd={addTask} onUpdate={updateTask} onDelete={deleteTask} />
-              <Calendar items={calItems} scope="freelance" onAddEvent={addEvent} />
+              <TaskList scope="all" tasks={filteredTasks} onAdd={addTask} onUpdate={updateTask} onDelete={deleteTask} />
+              <Calendar items={calItems} scope="all" onAddEvent={addEvent} />
             </div>
-          </div>
-        )}
-      </main>
+          )}
+
+          {scope === "hotel" && (
+            <div className="space-y-6">
+              <AppLauncher profile="hotel" links={filteredLinks} onAdd={addLink} onDelete={deleteLink} />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <TaskList scope="hotel" tasks={filteredTasks} onAdd={addTask} onUpdate={updateTask} onDelete={deleteTask} />
+                <Calendar items={calItems} scope="hotel" onAddEvent={addEvent} />
+              </div>
+            </div>
+          )}
+
+          {scope === "design" && (
+            <div className="space-y-6">
+              <AppLauncher profile="design" links={filteredLinks} onAdd={addLink} onDelete={deleteLink} />
+              <DesignBoard orders={orders} onAdd={addOrder} onUpdate={updateOrder} onDelete={deleteOrder} />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <TaskList scope="design" tasks={filteredTasks} onAdd={addTask} onUpdate={updateTask} onDelete={deleteTask} />
+                <Calendar items={calItems} scope="design" onAddEvent={addEvent} />
+              </div>
+            </div>
+          )}
+
+          {scope === "freelance" && (
+            <div className="space-y-6">
+              <AppLauncher profile="freelance" links={filteredLinks} onAdd={addLink} onDelete={deleteLink} />
+              <FreelanceTracker projects={projects} onAdd={addProject} onUpdate={updateProject} onDelete={deleteProject} />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <TaskList scope="freelance" tasks={filteredTasks} onAdd={addTask} onUpdate={updateTask} onDelete={deleteTask} />
+                <Calendar items={calItems} scope="freelance" onAddEvent={addEvent} />
+              </div>
+            </div>
+          )}
+        </main>
+      </div>
     </div>
   );
 }
+
+const TILE_ICONS: Record<string, string> = {
+  "Open tasks": "M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11",
+  "High priority": "M12 9v4m0 4h.01M10.29 3.86l-8.18 14.18A1 1 0 0 0 3 19.5h18a1 1 0 0 0 .89-1.46L13.71 3.86a1 1 0 0 0-1.72 0Z",
+  "Design orders in progress": "M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3Z M12 3v18 M4 7.5l8 4.5 8-4.5",
+  "Active freelance projects": "M3 7h18v13H3zM8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 12h18",
+};
+
+const TILE_ACCENT: Record<string, string> = {
+  "Open tasks": "text-hotel bg-hotel-50",
+  "High priority": "text-status-critical bg-red-50",
+  "Design orders in progress": "text-design bg-design-50",
+  "Active freelance projects": "text-freelance bg-freelance-50",
+};
 
 function SummaryStrip({
   scope,
@@ -249,11 +303,21 @@ function SummaryStrip({
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
       {tiles.map((tile) => (
-        <div key={tile.label} className="bg-white rounded-2xl border border-slate-200 px-4 py-3">
-          <p className="text-2xl font-semibold text-slate-900">{tile.value}</p>
-          <p className="text-xs text-slate-400">{tile.label}</p>
+        <div
+          key={tile.label}
+          className="bg-white rounded-2xl border border-slate-200/80 shadow-card px-4 py-4 flex items-start justify-between"
+        >
+          <div>
+            <p className="text-2xl font-semibold text-slate-900 tabular-nums">{tile.value}</p>
+            <p className="text-xs text-slate-400 mt-0.5">{tile.label}</p>
+          </div>
+          <span className={`flex h-9 w-9 items-center justify-center rounded-lg ${TILE_ACCENT[tile.label]}`}>
+            <svg viewBox="0 0 24 24" fill="none" className="h-[18px] w-[18px]">
+              <path d={TILE_ICONS[tile.label]} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
         </div>
       ))}
     </div>

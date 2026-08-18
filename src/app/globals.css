@@ -7,5 +7,14 @@ html, body {
 }
 
 body {
-  background-color: #f8fafc;
+  background-color: #f6f7f9;
+}
+
+::selection {
+  background-color: #cde2fb;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
 }

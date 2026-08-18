@@ -13,10 +13,18 @@ export interface CalItem {
 }
 
 const DOT: Record<Profile, string> = {
-  hotel: "bg-blue-500",
-  design: "bg-purple-500",
-  freelance: "bg-teal-500",
+  hotel: "bg-hotel",
+  design: "bg-design",
+  freelance: "bg-freelance",
   general: "bg-slate-400",
+};
+
+const SCOPE_ACCENT: Record<Profile | "all", string> = {
+  all: "bg-slate-900",
+  hotel: "bg-hotel",
+  design: "bg-design",
+  freelance: "bg-freelance",
+  general: "bg-slate-700",
 };
 
 function toISODate(d: Date) {
@@ -67,9 +75,12 @@ export default function Calendar({
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-5">
+    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-card p-5">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="font-semibold text-slate-800">Calendar</h2>
+        <div className="flex items-center gap-2">
+          <span className={`h-2 w-2 rounded-full ${SCOPE_ACCENT[scope]}`} />
+          <h2 className="font-semibold text-slate-800">Calendar</h2>
+        </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1))}
@@ -108,9 +119,9 @@ export default function Calendar({
               onClick={() => setSelected(iso)}
               className={`relative h-11 rounded-lg text-sm flex flex-col items-center justify-center gap-0.5 transition ${
                 isSelected
-                  ? "bg-slate-900 text-white"
+                  ? `${SCOPE_ACCENT[scope]} text-white shadow-card`
                   : isToday
-                  ? "bg-slate-100 text-slate-900 font-semibold"
+                  ? "bg-slate-100 text-slate-900 font-semibold ring-1 ring-slate-300"
                   : "hover:bg-slate-50 text-slate-700"
               }`}
             >
@@ -154,7 +165,7 @@ export default function Calendar({
             placeholder="Add note / meeting for this day…"
             className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm"
           />
-          <button type="submit" className="rounded-lg bg-slate-900 text-white px-3 py-1.5 text-sm">
+          <button type="submit" className={`rounded-lg text-white px-3 py-1.5 text-sm font-medium ${SCOPE_ACCENT[scope]}`}>
             Add
           </button>
         </form>

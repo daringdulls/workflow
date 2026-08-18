@@ -4,11 +4,11 @@ import { useState } from "react";
 import { DesignOrder, DesignStatus, Priority, PRIORITIES, PRIORITY_LABEL } from "@/lib/types";
 import PriorityBadge from "./PriorityBadge";
 
-const COLUMNS: { key: DesignStatus; label: string }[] = [
-  { key: "new", label: "New" },
-  { key: "in_progress", label: "In Progress" },
-  { key: "review", label: "Review" },
-  { key: "delivered", label: "Delivered" },
+const COLUMNS: { key: DesignStatus; label: string; dot: string }[] = [
+  { key: "new", label: "New", dot: "bg-slate-400" },
+  { key: "in_progress", label: "In Progress", dot: "bg-design" },
+  { key: "review", label: "Review", dot: "bg-amber-500" },
+  { key: "delivered", label: "Delivered", dot: "bg-emerald-500" },
 ];
 
 export default function DesignBoard({
@@ -51,38 +51,44 @@ export default function DesignBoard({
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-5">
+    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-card p-5">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="font-semibold text-slate-800">Design Requests</h2>
-        <button onClick={() => setAdding((v) => !v)} className="text-sm text-slate-500 hover:text-slate-800">
+        <div className="flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-design" />
+          <h2 className="font-semibold text-slate-800">Design Requests</h2>
+        </div>
+        <button
+          onClick={() => setAdding((v) => !v)}
+          className="text-sm font-medium text-white rounded-lg px-3 py-1.5 bg-design hover:bg-design-700 transition"
+        >
           {adding ? "Cancel" : "+ New order"}
         </button>
       </div>
 
       {adding && (
-        <form onSubmit={submit} className="flex flex-wrap gap-2 mb-5">
+        <form onSubmit={submit} className="flex flex-wrap gap-2 mb-5 bg-slate-50 rounded-xl p-3 border border-slate-100">
           <input
             value={client}
             onChange={(e) => setClient(e.target.value)}
             placeholder="Client / brand name"
-            className="flex-1 min-w-[140px] rounded-lg border border-slate-200 px-3 py-1.5"
+            className="flex-1 min-w-[140px] rounded-lg border border-slate-200 px-3 py-1.5 bg-white"
           />
           <input
             value={desc}
             onChange={(e) => setDesc(e.target.value)}
             placeholder="What do they need?"
-            className="flex-[2] min-w-[180px] rounded-lg border border-slate-200 px-3 py-1.5"
+            className="flex-[2] min-w-[180px] rounded-lg border border-slate-200 px-3 py-1.5 bg-white"
           />
           <input
             type="date"
             value={due}
             onChange={(e) => setDue(e.target.value)}
-            className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+            className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm bg-white"
           />
           <select
             value={priority}
             onChange={(e) => setPriority(e.target.value as Priority)}
-            className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+            className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm bg-white"
           >
             {PRIORITIES.map((p) => (
               <option key={p} value={p}>
@@ -90,7 +96,7 @@ export default function DesignBoard({
               </option>
             ))}
           </select>
-          <button type="submit" className="rounded-lg bg-purple-600 text-white px-4 py-1.5 text-sm">
+          <button type="submit" className="rounded-lg bg-design hover:bg-design-700 text-white px-4 py-1.5 text-sm font-medium">
             Add
           </button>
         </form>
@@ -102,12 +108,15 @@ export default function DesignBoard({
           return (
             <div key={col.key} className="bg-slate-50 rounded-xl p-3">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2 flex items-center justify-between">
-                {col.label}
+                <span className="flex items-center gap-1.5">
+                  <span className={`h-1.5 w-1.5 rounded-full ${col.dot}`} />
+                  {col.label}
+                </span>
                 <span className="text-slate-400">{colOrders.length}</span>
               </p>
               <div className="space-y-2">
                 {colOrders.map((o) => (
-                  <div key={o.id} className="bg-white rounded-lg border border-slate-200 p-3">
+                  <div key={o.id} className="bg-white rounded-lg border border-slate-200 p-3 shadow-card hover:shadow-card-hover transition">
                     <div className="flex items-start justify-between gap-2 mb-1">
                       <p className="text-sm font-medium text-slate-800">{o.client_name}</p>
                       <PriorityBadge priority={o.priority} />
