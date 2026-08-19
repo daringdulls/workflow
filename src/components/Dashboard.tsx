@@ -28,7 +28,11 @@ async function api<T>(url: string, options?: RequestInit): Promise<T> {
 }
 
 function toISO(d: Date) {
-  return d.toISOString().slice(0, 10);
+  // Local calendar fields, not toISOString() (UTC) — see Calendar.tsx for why.
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 export default function Dashboard() {
@@ -97,7 +101,16 @@ export default function Dashboard() {
   }
 
   // ---- Design orders ----
-  async function addOrder(o: { client_name: string; description: string; priority: DesignOrder["priority"]; due_date: string | null }) {
+  async function addOrder(o: {
+    order_name: string;
+    order_type: string;
+    client_name: string;
+    sponsor: string;
+    description: string;
+    priority: DesignOrder["priority"];
+    requested_date: string | null;
+    due_date: string | null;
+  }) {
     const created = await api<DesignOrder>("/api/design-orders", { method: "POST", body: JSON.stringify(o) });
     setOrders((prev) => [created, ...prev]);
   }
@@ -150,7 +163,7 @@ export default function Dashboard() {
       if (t.due_date) items.push({ id: `task-${t.id}`, date: t.due_date.slice(0, 10), title: t.title, profile: t.profile, kind: "task" });
     }
     for (const o of orders) {
-      if (o.due_date) items.push({ id: `order-${o.id}`, date: o.due_date.slice(0, 10), title: `${o.client_name} design due`, profile: "design", kind: "design" });
+      if (o.due_date) items.push({ id: `order-${o.id}`, date: o.due_date.slice(0, 10), title: `${o.order_name || o.client_name} due`, profile: "design", kind: "design" });
     }
     for (const p of projects) {
       if (p.deadline) items.push({ id: `proj-${p.id}`, date: p.deadline.slice(0, 10), title: `${p.project_name} due`, profile: "freelance", kind: "freelance" });
@@ -177,8 +190,9 @@ export default function Dashboard() {
     for (const o of orders) {
       if (o.status === "delivered" || !o.due_date) continue;
       const d = o.due_date.slice(0, 10);
-      if (d < todayISO) items.push({ id: `o-${o.id}`, text: `${o.client_name}'s design order is overdue`, tone: "critical" });
-      else if (d === todayISO) items.push({ id: `o-${o.id}`, text: `${o.client_name}'s design order is due today`, tone: "warning" });
+      const orderLabel = o.order_name || o.client_name;
+      if (d < todayISO) items.push({ id: `o-${o.id}`, text: `${orderLabel} is overdue`, tone: "critical" });
+      else if (d === todayISO) items.push({ id: `o-${o.id}`, text: `${orderLabel} is due today`, tone: "warning" });
     }
     for (const p of projects) {
       if (p.status === "delivered" || p.status === "paid" || !p.deadline) continue;
@@ -196,7 +210,14 @@ export default function Dashboard() {
   const searchedTasks = q ? filteredTasks.filter((t) => t.title.toLowerCase().includes(q)) : filteredTasks;
   const searchedLinks = q ? filteredLinks.filter((l) => l.label.toLowerCase().includes(q)) : filteredLinks;
   const searchedOrders = q
-    ? orders.filter((o) => o.client_name.toLowerCase().includes(q) || (o.description ?? "").toLowerCase().includes(q))
+    ? orders.filter(
+        (o) =>
+          o.client_name.toLowerCase().includes(q) ||
+          (o.order_name ?? "").toLowerCase().includes(q) ||
+          (o.order_type ?? "").toLowerCase().includes(q) ||
+          (o.sponsor ?? "").toLowerCase().includes(q) ||
+          (o.description ?? "").toLowerCase().includes(q)
+      )
     : orders;
   const searchedProjects = q
     ? projects.filter((p) => p.project_name.toLowerCase().includes(q) || p.client_name.toLowerCase().includes(q))

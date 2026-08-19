@@ -28,13 +28,29 @@ export interface AppLink {
   sort_order: number;
 }
 
+export const ORDER_TYPES = [
+  "Business Cards",
+  "Banner / Signage",
+  "Apparel / Jersey",
+  "Mug / Sublimation Item",
+  "Packaging / Label",
+  "Social Media Graphic",
+  "Logo / Branding",
+  "Other",
+] as const;
+
 export interface DesignOrder {
   id: number;
+  order_name: string;
+  order_type: string;
   client_name: string;
-  description: string | null;
+  sponsor: string | null;
+  description: string | null; // "Other relevant information"
+  logo_url: string | null;
   priority: Priority;
   status: DesignStatus;
-  due_date: string | null;
+  requested_date: string | null;
+  due_date: string | null; // delivery date
   created_at: string;
 }
 

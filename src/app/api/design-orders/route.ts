@@ -11,13 +11,29 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   await ensureSchema();
-  const { client_name, description, priority, status, due_date } = await req.json();
-  if (!client_name) {
-    return NextResponse.json({ error: "client_name is required" }, { status: 400 });
+  const {
+    order_name,
+    order_type,
+    client_name,
+    sponsor,
+    description,
+    logo_url,
+    priority,
+    status,
+    requested_date,
+    due_date,
+  } = await req.json();
+
+  if (!order_name || !client_name) {
+    return NextResponse.json({ error: "order_name and client_name are required" }, { status: 400 });
   }
+
   const rows = await sql`
-    INSERT INTO design_orders (client_name, description, priority, status, due_date)
-    VALUES (${client_name}, ${description ?? null}, ${priority ?? "medium"}, ${status ?? "new"}, ${due_date ?? null})
+    INSERT INTO design_orders
+      (order_name, order_type, client_name, sponsor, description, logo_url, priority, status, requested_date, due_date)
+    VALUES
+      (${order_name}, ${order_type ?? "Other"}, ${client_name}, ${sponsor ?? null}, ${description ?? null},
+       ${logo_url ?? null}, ${priority ?? "medium"}, ${status ?? "new"}, ${requested_date ?? null}, ${due_date ?? null})
     RETURNING *;
   `;
   return NextResponse.json(rows[0], { status: 201 });

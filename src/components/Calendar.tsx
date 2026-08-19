@@ -41,7 +41,15 @@ const MONTH_NAMES = [
 ];
 
 function toISODate(d: Date) {
-  return d.toISOString().slice(0, 10);
+  // Build the ISO date from LOCAL calendar fields, not toISOString() (which
+  // converts to UTC first). For timezones ahead of UTC (e.g. Maldives,
+  // UTC+5), a UTC round-trip shifts local midnight back a calendar day,
+  // desyncing "today"/grid cells from what the user actually sees on their
+  // clock. This keeps everything anchored to the browser's local date.
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 interface DayCell {

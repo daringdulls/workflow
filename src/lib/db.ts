@@ -82,6 +82,14 @@ export async function ensureSchema() {
     );
   `;
 
+  // Added for the staff design-request intake form. IF NOT EXISTS keeps this
+  // safe to run against a database that already has the original columns.
+  await sql`ALTER TABLE design_orders ADD COLUMN IF NOT EXISTS order_name TEXT NOT NULL DEFAULT '';`;
+  await sql`ALTER TABLE design_orders ADD COLUMN IF NOT EXISTS order_type TEXT NOT NULL DEFAULT 'Other';`;
+  await sql`ALTER TABLE design_orders ADD COLUMN IF NOT EXISTS sponsor TEXT;`;
+  await sql`ALTER TABLE design_orders ADD COLUMN IF NOT EXISTS logo_url TEXT;`;
+  await sql`ALTER TABLE design_orders ADD COLUMN IF NOT EXISTS requested_date DATE;`;
+
   await sql`
     CREATE TABLE IF NOT EXISTS freelance_projects (
       id SERIAL PRIMARY KEY,

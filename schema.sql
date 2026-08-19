@@ -25,11 +25,16 @@ CREATE TABLE IF NOT EXISTS tasks (
 
 CREATE TABLE IF NOT EXISTS design_orders (
   id SERIAL PRIMARY KEY,
+  order_name TEXT NOT NULL DEFAULT '',
+  order_type TEXT NOT NULL DEFAULT 'Other',
   client_name TEXT NOT NULL,
-  description TEXT,
+  sponsor TEXT,
+  description TEXT, -- "Other relevant information"
+  logo_url TEXT,
   priority TEXT NOT NULL DEFAULT 'medium',
   status TEXT NOT NULL DEFAULT 'new',
-  due_date DATE,
+  requested_date DATE,
+  due_date DATE, -- delivery date
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
