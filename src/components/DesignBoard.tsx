@@ -5,6 +5,7 @@ import {
   DESIGN_TYPES,
   DesignOrder,
   DesignStatus,
+  jerseyRolesOf,
   ORDER_TYPES,
   Priority,
   PRIORITIES,
@@ -43,6 +44,16 @@ function garmentPills(o: DesignOrder) {
   if (o.needs_tracksuit) pills.push("Track suit");
   if (o.needs_skirt) pills.push("Skirt");
   return pills;
+}
+
+function sleeveTypesOf(o: DesignOrder): string[] {
+  if (o.sleeve_types && o.sleeve_types.length > 0) return o.sleeve_types;
+  return o.sleeve_type ? [o.sleeve_type] : [];
+}
+
+function sponsorsOf(o: DesignOrder): { name: string; logo_url: string | null }[] {
+  if (o.sponsors && o.sponsors.length > 0) return o.sponsors;
+  return o.sponsor || o.sponsor_logo_url ? [{ name: o.sponsor ?? "", logo_url: o.sponsor_logo_url }] : [];
 }
 
 /** Small 4-segment progress bar showing how far along the pipeline this order is. */
@@ -263,6 +274,7 @@ export default function DesignBoard({
               <div className="space-y-2">
                 {colOrders.map((o) => {
                   const pills = garmentPills(o);
+                  const sponsors = sponsorsOf(o).filter((s) => s.name);
                   return (
                     <div
                       key={o.id}
@@ -310,7 +322,13 @@ export default function DesignBoard({
 
                       <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
                         {o.client_name}
-                        {o.sponsor ? <span className="text-slate-400 dark:text-slate-500"> · Sponsor: {o.sponsor}</span> : null}
+                        {sponsors.length > 0 && (
+                          <span className="text-slate-400 dark:text-slate-500">
+                            {" "}
+                            · Sponsor: {sponsors[0].name}
+                            {sponsors.length > 1 ? ` +${sponsors.length - 1} more` : ""}
+                          </span>
+                        )}
                       </p>
 
                       {pills.length > 0 && (
@@ -422,11 +440,16 @@ function OrderDetailModal({
 }) {
   const href = order.contact ? contactHref(order.contact) : null;
   const pills = garmentPills(order);
-  const numbers = [
-    order.number_front && `Front ${order.number_front}`,
-    order.number_back && `Back ${order.number_back}`,
-    order.number_shorts && `Shorts ${order.number_shorts}`,
-  ].filter(Boolean) as string[];
+  const sleeves = sleeveTypesOf(order);
+  const roles = jerseyRolesOf(order);
+  const sponsors = sponsorsOf(order);
+  const numbers = order.needs_numbering
+    ? ([
+        order.number_front && `Front ${order.number_front}`,
+        order.number_back && `Back ${order.number_back}`,
+        order.number_shorts && `Shorts ${order.number_shorts}`,
+      ].filter(Boolean) as string[])
+    : [];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -504,47 +527,64 @@ function OrderDetailModal({
           <DetailField label="Submitted" value={new Date(order.created_at).toLocaleString()} />
         </div>
 
-        {(order.sponsor || order.sponsor_logo_url) && (
-          <div className="flex items-center gap-3 mb-5 rounded-xl border border-slate-100 dark:border-slate-800 p-3">
-            {order.sponsor_logo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={order.sponsor_logo_url}
-                alt=""
-                className="h-11 w-11 rounded object-contain bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 shrink-0"
-              />
-            ) : null}
-            <div>
-              <p className="text-xs text-slate-400 dark:text-slate-500 mb-0.5">Sponsor</p>
-              <p className="text-sm text-slate-800 dark:text-slate-100">{order.sponsor || "—"}</p>
+        {sponsors.length > 0 && (
+          <div className="mb-5">
+            <p className="text-xs text-slate-400 dark:text-slate-500 mb-1.5">
+              {sponsors.length > 1 ? "Sponsors" : "Sponsor"}
+            </p>
+            <div className="space-y-2">
+              {sponsors.map((s, idx) => (
+                <div key={idx} className="flex items-center gap-3 rounded-xl border border-slate-100 dark:border-slate-800 p-3">
+                  {s.logo_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={s.logo_url}
+                      alt=""
+                      className="h-11 w-11 rounded object-contain bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 shrink-0"
+                    />
+                  ) : null}
+                  <p className="text-sm text-slate-800 dark:text-slate-100">{s.name || "—"}</p>
+                  {s.logo_url && (
+                    <a
+                      href={s.logo_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="ml-auto text-xs text-design dark:text-design-400 hover:underline shrink-0"
+                    >
+                      Open full-size
+                    </a>
+                  )}
+                </div>
+              ))}
             </div>
-            {order.sponsor_logo_url && (
-              <a
-                href={order.sponsor_logo_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="ml-auto text-xs text-design dark:text-design-400 hover:underline shrink-0"
-              >
-                Open full-size
-              </a>
-            )}
           </div>
         )}
 
-        {(pills.length > 0 || order.neck_type || order.sleeve_type || numbers.length > 0) && (
+        {(roles.length > 0 || pills.length > 0 || order.neck_type || sleeves.length > 0 || numbers.length > 0) && (
           <div className="mb-5">
             <p className="text-xs text-slate-400 dark:text-slate-500 mb-1.5">Garment details</p>
             <div className="flex flex-wrap gap-1.5">
+              {roles.map((r) => (
+                <span
+                  key={r}
+                  className="text-xs font-medium px-2 py-1 rounded-full bg-design-100 dark:bg-design/25 text-design-700 dark:text-design-300"
+                >
+                  {r}
+                </span>
+              ))}
               {order.neck_type && (
                 <span className="text-xs font-medium px-2 py-1 rounded-full bg-design-50 dark:bg-design/15 text-design dark:text-design-400">
                   Neck: {order.neck_type}
                 </span>
               )}
-              {order.sleeve_type && (
-                <span className="text-xs font-medium px-2 py-1 rounded-full bg-design-50 dark:bg-design/15 text-design dark:text-design-400">
-                  Sleeve: {order.sleeve_type}
+              {sleeves.map((s) => (
+                <span
+                  key={s}
+                  className="text-xs font-medium px-2 py-1 rounded-full bg-design-50 dark:bg-design/15 text-design dark:text-design-400"
+                >
+                  Sleeve: {s}
                 </span>
-              )}
+              ))}
               {pills.map((p) => (
                 <span
                   key={p}

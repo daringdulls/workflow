@@ -12,13 +12,13 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   await ensureSchema();
   const body = await req.json();
-  const { profile, title, notes, due_date, priority, status } = body;
+  const { profile, title, notes, due_date, priority, status, remind_at } = body;
   if (!profile || !title) {
     return NextResponse.json({ error: "profile and title are required" }, { status: 400 });
   }
   const rows = await sql`
-    INSERT INTO tasks (profile, title, notes, due_date, priority, status)
-    VALUES (${profile}, ${title}, ${notes ?? null}, ${due_date ?? null}, ${priority ?? "medium"}, ${status ?? "todo"})
+    INSERT INTO tasks (profile, title, notes, due_date, priority, status, remind_at)
+    VALUES (${profile}, ${title}, ${notes ?? null}, ${due_date ?? null}, ${priority ?? "medium"}, ${status ?? "todo"}, ${remind_at ?? null})
     RETURNING *;
   `;
   return NextResponse.json(rows[0], { status: 201 });

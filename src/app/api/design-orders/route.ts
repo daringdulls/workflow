@@ -17,8 +17,7 @@ export async function POST(req: NextRequest) {
     design_type,
     client_name,
     contact,
-    sponsor,
-    sponsor_logo_url,
+    sponsors,
     description,
     logo_url,
     priority,
@@ -28,11 +27,16 @@ export async function POST(req: NextRequest) {
     needs_shorts,
     needs_tracksuit,
     needs_skirt,
+    needs_numbering,
     number_front,
     number_back,
     number_shorts,
     neck_type,
-    sleeve_type,
+    sleeve_types,
+    role_player,
+    role_keeper,
+    role_libero,
+    role_official,
     reference_notes,
   } = await req.json();
 
@@ -42,17 +46,19 @@ export async function POST(req: NextRequest) {
 
   const rows = await sql`
     INSERT INTO design_orders
-      (order_name, order_type, design_type, client_name, contact, sponsor, sponsor_logo_url,
+      (order_name, order_type, design_type, client_name, contact, sponsors,
        description, logo_url, priority, status, requested_date, due_date,
-       needs_shorts, needs_tracksuit, needs_skirt, number_front, number_back, number_shorts,
-       neck_type, sleeve_type, reference_notes)
+       needs_shorts, needs_tracksuit, needs_skirt, needs_numbering,
+       number_front, number_back, number_shorts,
+       neck_type, sleeve_types, role_player, role_keeper, role_libero, role_official, reference_notes)
     VALUES
       (${order_name}, ${order_type ?? "Other"}, ${design_type ?? "Jersey"}, ${client_name}, ${contact ?? null},
-       ${sponsor ?? null}, ${sponsor_logo_url ?? null}, ${description ?? null}, ${logo_url ?? null},
+       ${JSON.stringify(sponsors ?? [])}, ${description ?? null}, ${logo_url ?? null},
        ${priority ?? "medium"}, ${status ?? "new"}, ${requested_date ?? null}, ${due_date ?? null},
-       ${needs_shorts ?? false}, ${needs_tracksuit ?? false}, ${needs_skirt ?? false},
+       ${needs_shorts ?? false}, ${needs_tracksuit ?? false}, ${needs_skirt ?? false}, ${needs_numbering ?? false},
        ${number_front ?? null}, ${number_back ?? null}, ${number_shorts ?? null},
-       ${neck_type ?? null}, ${sleeve_type ?? null}, ${reference_notes ?? null})
+       ${neck_type ?? null}, ${sleeve_types ?? []}, ${role_player ?? false}, ${role_keeper ?? false},
+       ${role_libero ?? false}, ${role_official ?? false}, ${reference_notes ?? null})
     RETURNING *;
   `;
   return NextResponse.json(rows[0], { status: 201 });

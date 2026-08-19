@@ -69,6 +69,8 @@ export async function ensureSchema() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `;
+  // Added for task reminders — an absolute instant the browser notifies at.
+  await sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS remind_at TIMESTAMPTZ;`;
 
   await sql`
     CREATE TABLE IF NOT EXISTS design_orders (
@@ -106,6 +108,17 @@ export async function ensureSchema() {
   await sql`ALTER TABLE design_orders ADD COLUMN IF NOT EXISTS sleeve_type TEXT;`;
   await sql`ALTER TABLE design_orders ADD COLUMN IF NOT EXISTS reference_notes TEXT;`;
 
+  // Added for: Yes/No numbering toggle, multi-select sleeve types, required
+  // jersey roles (Player/Keeper/Libero/Official — only when design_type is
+  // "Jersey"), and multiple sponsors (each with its own logo upload).
+  await sql`ALTER TABLE design_orders ADD COLUMN IF NOT EXISTS needs_numbering BOOLEAN NOT NULL DEFAULT false;`;
+  await sql`ALTER TABLE design_orders ADD COLUMN IF NOT EXISTS sleeve_types TEXT[] NOT NULL DEFAULT '{}';`;
+  await sql`ALTER TABLE design_orders ADD COLUMN IF NOT EXISTS role_player BOOLEAN NOT NULL DEFAULT false;`;
+  await sql`ALTER TABLE design_orders ADD COLUMN IF NOT EXISTS role_keeper BOOLEAN NOT NULL DEFAULT false;`;
+  await sql`ALTER TABLE design_orders ADD COLUMN IF NOT EXISTS role_libero BOOLEAN NOT NULL DEFAULT false;`;
+  await sql`ALTER TABLE design_orders ADD COLUMN IF NOT EXISTS role_official BOOLEAN NOT NULL DEFAULT false;`;
+  await sql`ALTER TABLE design_orders ADD COLUMN IF NOT EXISTS sponsors JSONB NOT NULL DEFAULT '[]';`;
+
   await sql`
     CREATE TABLE IF NOT EXISTS freelance_projects (
       id SERIAL PRIMARY KEY,
@@ -130,6 +143,8 @@ export async function ensureSchema() {
       notes TEXT
     );
   `;
+  // Added for calendar reminders — an absolute instant the browser notifies at.
+  await sql`ALTER TABLE events ADD COLUMN IF NOT EXISTS remind_at TIMESTAMPTZ;`;
 
   // Seed default app-launcher links the first time the table is empty, so
   // the dashboard isn't blank on first run. The user can edit/delete these

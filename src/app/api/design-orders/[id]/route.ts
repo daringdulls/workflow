@@ -13,6 +13,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     "contact",
     "sponsor",
     "sponsor_logo_url",
+    "sponsors",
     "description",
     "logo_url",
     "priority",
@@ -22,20 +23,29 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     "needs_shorts",
     "needs_tracksuit",
     "needs_skirt",
+    "needs_numbering",
     "number_front",
     "number_back",
     "number_shorts",
     "neck_type",
     "sleeve_type",
+    "sleeve_types",
+    "role_player",
+    "role_keeper",
+    "role_libero",
+    "role_official",
     "reference_notes",
   ] as const;
+  // jsonb columns need the JS value serialized before it hits the parameterized
+  // query — Postgres won't infer "this object means jsonb" on its own.
+  const JSON_FIELDS = new Set(["sponsors"]);
   const updates: string[] = [];
   const values: unknown[] = [];
   let i = 1;
   for (const f of fields) {
     if (f in body) {
       updates.push(`${f} = $${i}`);
-      values.push(body[f]);
+      values.push(JSON_FIELDS.has(f) ? JSON.stringify(body[f]) : body[f]);
       i++;
     }
   }

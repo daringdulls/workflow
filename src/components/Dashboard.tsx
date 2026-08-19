@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AppLink,
@@ -15,8 +15,13 @@ import AppLauncher from "./AppLauncher";
 import TaskList from "./TaskList";
 import Calendar, { CalItem } from "./Calendar";
 import DesignBoard from "./DesignBoard";
+import DesignKPI from "./DesignKPI";
 import FreelanceTracker from "./FreelanceTracker";
 import ThemeToggle from "./ThemeToggle";
+
+const LAST_SEEN_ORDER_KEY = "wf_last_seen_order_id";
+const NOTIFIED_REMINDERS_KEY = "wf_notified_reminders";
+const POLL_MS = 45_000;
 
 async function api<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, {
@@ -49,6 +54,11 @@ export default function Dashboard() {
   const [projects, setProjects] = useState<FreelanceProject[]>([]);
   const [events, setEvents] = useState<CalEvent[]>([]);
 
+  const [liveAlerts, setLiveAlerts] = useState<{ id: string; text: string; tone: "info" }[]>([]);
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission | "unsupported">("default");
+  const notifPermissionRef = useRef(notifPermission);
+  notifPermissionRef.current = notifPermission;
+
   useEffect(() => {
     (async () => {
       try {
@@ -64,10 +74,92 @@ export default function Dashboard() {
         setOrders(o);
         setProjects(p);
         setEvents(e);
+
+        // Seed "last seen order" so we only ever alert on orders that arrive
+        // AFTER this session starts, never the whole existing backlog.
+        if (typeof window !== "undefined" && !localStorage.getItem(LAST_SEEN_ORDER_KEY)) {
+          const maxId = o.reduce((m, ord) => Math.max(m, ord.id), 0);
+          localStorage.setItem(LAST_SEEN_ORDER_KEY, String(maxId));
+        }
       } finally {
         setLoading(false);
       }
     })();
+
+    if (typeof window !== "undefined" && "Notification" in window) {
+      setNotifPermission(Notification.permission);
+    } else {
+      setNotifPermission("unsupported");
+    }
+  }, []);
+
+  function enableNotifications() {
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+    Notification.requestPermission().then(setNotifPermission);
+  }
+
+  // Poll for new design requests and due reminders every ~45s, and push a
+  // browser notification (when permission is granted) plus an in-app alert.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function poll() {
+      try {
+        const [freshOrders, freshTasks, freshEvents] = await Promise.all([
+          api<DesignOrder[]>("/api/design-orders"),
+          api<Task[]>("/api/tasks"),
+          api<CalEvent[]>("/api/events"),
+        ]);
+        if (cancelled) return;
+
+        const lastSeen = Number(localStorage.getItem(LAST_SEEN_ORDER_KEY) || 0);
+        const newest = freshOrders.reduce((m, o) => Math.max(m, o.id), lastSeen);
+        const arrived = freshOrders.filter((o) => o.id > lastSeen);
+        for (const o of arrived) {
+          const text = `New design request: ${o.order_name || "Untitled"} from ${o.client_name}`;
+          setLiveAlerts((prev) => [{ id: `new-order-${o.id}`, text, tone: "info" as const }, ...prev].slice(0, 10));
+          if (notifPermissionRef.current === "granted") {
+            new Notification("New design request", { body: text });
+          }
+        }
+        if (newest !== lastSeen) localStorage.setItem(LAST_SEEN_ORDER_KEY, String(newest));
+
+        const notified: Set<string> = new Set(JSON.parse(localStorage.getItem(NOTIFIED_REMINDERS_KEY) || "[]"));
+        const now = Date.now();
+        let notifiedChanged = false;
+        for (const t of freshTasks) {
+          const key = `task-${t.id}`;
+          if (t.remind_at && t.status !== "done" && new Date(t.remind_at).getTime() <= now && !notified.has(key)) {
+            notified.add(key);
+            notifiedChanged = true;
+            setLiveAlerts((prev) => [{ id: key, text: `Reminder: ${t.title}`, tone: "info" as const }, ...prev].slice(0, 10));
+            if (notifPermissionRef.current === "granted") new Notification("Task reminder", { body: t.title });
+          }
+        }
+        for (const e of freshEvents) {
+          const key = `event-${e.id}`;
+          if (e.remind_at && new Date(e.remind_at).getTime() <= now && !notified.has(key)) {
+            notified.add(key);
+            notifiedChanged = true;
+            setLiveAlerts((prev) => [{ id: key, text: `Reminder: ${e.title}`, tone: "info" as const }, ...prev].slice(0, 10));
+            if (notifPermissionRef.current === "granted") new Notification("Calendar reminder", { body: e.title });
+          }
+        }
+        if (notifiedChanged) localStorage.setItem(NOTIFIED_REMINDERS_KEY, JSON.stringify(Array.from(notified)));
+
+        setOrders(freshOrders);
+        setTasks(freshTasks);
+        setEvents(freshEvents);
+      } catch {
+        // transient network/poll failure — try again next tick
+      }
+    }
+
+    const interval = setInterval(poll, POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
   async function logout() {
@@ -77,7 +169,13 @@ export default function Dashboard() {
   }
 
   // ---- Tasks ----
-  async function addTask(t: { profile: Profile; title: string; due_date: string | null; priority: Task["priority"] }) {
+  async function addTask(t: {
+    profile: Profile;
+    title: string;
+    due_date: string | null;
+    priority: Task["priority"];
+    remind_at?: string | null;
+  }) {
     const created = await api<Task>("/api/tasks", { method: "POST", body: JSON.stringify(t) });
     setTasks((prev) => [created, ...prev]);
   }
@@ -113,7 +211,11 @@ export default function Dashboard() {
     requested_date: string | null;
     due_date: string | null;
   }) {
-    const created = await api<DesignOrder>("/api/design-orders", { method: "POST", body: JSON.stringify(o) });
+    const { sponsor, ...rest } = o;
+    const created = await api<DesignOrder>("/api/design-orders", {
+      method: "POST",
+      body: JSON.stringify({ ...rest, sponsors: sponsor ? [{ name: sponsor, logo_url: null }] : [] }),
+    });
     setOrders((prev) => [created, ...prev]);
   }
   async function updateOrder(id: number, patch: Partial<DesignOrder>) {
@@ -150,11 +252,17 @@ export default function Dashboard() {
   }
 
   // ---- Events ----
-  async function addEvent(title: string, date: string) {
+  async function addEvent(title: string, date: string, time?: string | null, remindOffsetMinutes?: number | null) {
     const profile: Profile = scope === "all" ? "general" : scope;
+    let remind_at: string | null = null;
+    if (time && remindOffsetMinutes != null) {
+      const at = new Date(`${date}T${time}`);
+      at.setMinutes(at.getMinutes() - remindOffsetMinutes);
+      remind_at = at.toISOString();
+    }
     const created = await api<CalEvent>("/api/events", {
       method: "POST",
-      body: JSON.stringify({ profile, title, date }),
+      body: JSON.stringify({ profile, title, date, time: time || null, remind_at }),
     });
     setEvents((prev) => [...prev, created]);
   }
@@ -162,7 +270,15 @@ export default function Dashboard() {
   const calItems: CalItem[] = useMemo(() => {
     const items: CalItem[] = [];
     for (const t of tasks) {
-      if (t.due_date) items.push({ id: `task-${t.id}`, date: t.due_date.slice(0, 10), title: t.title, profile: t.profile, kind: "task" });
+      if (t.due_date)
+        items.push({
+          id: `task-${t.id}`,
+          date: t.due_date.slice(0, 10),
+          title: t.title,
+          profile: t.profile,
+          kind: "task",
+          hasReminder: !!t.remind_at,
+        });
     }
     for (const o of orders) {
       if (o.due_date) items.push({ id: `order-${o.id}`, date: o.due_date.slice(0, 10), title: `${o.order_name || o.client_name} due`, profile: "design", kind: "design" });
@@ -171,7 +287,14 @@ export default function Dashboard() {
       if (p.deadline) items.push({ id: `proj-${p.id}`, date: p.deadline.slice(0, 10), title: `${p.project_name} due`, profile: "freelance", kind: "freelance" });
     }
     for (const e of events) {
-      items.push({ id: `event-${e.id}`, date: e.date.slice(0, 10), title: e.title, profile: e.profile, kind: "event" });
+      items.push({
+        id: `event-${e.id}`,
+        date: e.date.slice(0, 10),
+        title: e.title,
+        profile: e.profile,
+        kind: "event",
+        hasReminder: !!e.remind_at,
+      });
     }
     return items;
   }, [tasks, orders, projects, events]);
@@ -204,6 +327,8 @@ export default function Dashboard() {
     }
     return items.slice(0, 8);
   }, [tasks, orders, projects]);
+
+  const allAlerts = useMemo(() => [...liveAlerts, ...notifications], [liveAlerts, notifications]);
 
   const filteredTasks = scope === "all" ? tasks : tasks.filter((t) => t.profile === scope);
   const filteredLinks = scope === "all" ? links : links.filter((l) => l.profile === scope);
@@ -373,26 +498,41 @@ export default function Dashboard() {
                     />
                     <path d="M9.5 18a2.5 2.5 0 0 0 5 0" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
                   </svg>
-                  {notifications.length > 0 && (
+                  {allAlerts.length > 0 && (
                     <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-status-critical px-1 text-[10px] font-semibold text-white">
-                      {notifications.length}
+                      {allAlerts.length}
                     </span>
                   )}
                 </button>
                 {notifOpen && (
                   <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl z-50">
-                    <p className="px-4 py-3 text-sm font-semibold text-slate-800 dark:text-slate-100 border-b border-slate-100 dark:border-slate-800">
-                      Notifications
-                    </p>
-                    {notifications.length === 0 ? (
+                    <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Notifications</p>
+                      {notifPermission === "default" && (
+                        <button
+                          onClick={enableNotifications}
+                          className="text-xs font-medium text-design dark:text-design-400 hover:underline shrink-0"
+                        >
+                          Enable alerts
+                        </button>
+                      )}
+                      {notifPermission === "granted" && (
+                        <span className="text-[11px] text-emerald-600 dark:text-emerald-400">Alerts on</span>
+                      )}
+                    </div>
+                    {allAlerts.length === 0 ? (
                       <p className="px-4 py-6 text-sm text-slate-400 text-center">You&apos;re all caught up.</p>
                     ) : (
                       <div className="py-1">
-                        {notifications.map((n) => (
+                        {allAlerts.map((n) => (
                           <div key={n.id} className="flex items-start gap-2.5 px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/60">
                             <span
                               className={`mt-1.5 h-1.5 w-1.5 rounded-full shrink-0 ${
-                                n.tone === "critical" ? "bg-status-critical" : "bg-status-warning"
+                                n.tone === "critical"
+                                  ? "bg-status-critical"
+                                  : n.tone === "warning"
+                                  ? "bg-status-warning"
+                                  : "bg-design"
                               }`}
                             />
                             <p className="text-sm text-slate-600 dark:text-slate-300">{n.text}</p>
@@ -439,6 +579,7 @@ export default function Dashboard() {
           {scope === "design" && (
             <div className="space-y-6">
               <AppLauncher profile="design" links={searchedLinks} onAdd={addLink} onDelete={deleteLink} />
+              <DesignKPI orders={orders} />
               <div id="design-section" className="scroll-mt-24">
                 <DesignBoard orders={searchedOrders} onAdd={addOrder} onUpdate={updateOrder} onDelete={deleteOrder} />
               </div>

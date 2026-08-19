@@ -47,7 +47,13 @@ export default function TaskList({
 }: {
   scope: Profile | "all";
   tasks: Task[];
-  onAdd: (t: { profile: Profile; title: string; due_date: string | null; priority: Priority }) => void;
+  onAdd: (t: {
+    profile: Profile;
+    title: string;
+    due_date: string | null;
+    priority: Priority;
+    remind_at?: string | null;
+  }) => void;
   onUpdate: (id: number, patch: Partial<Task>) => void;
   onDelete: (id: number) => void;
 }) {
@@ -56,6 +62,8 @@ export default function TaskList({
   const [priority, setPriority] = useState<Priority>("medium");
   const [profile, setProfile] = useState<Profile>(scope === "all" ? "hotel" : (scope as Profile));
   const [showAll, setShowAll] = useState(false);
+  const [showReminder, setShowReminder] = useState(false);
+  const [remindAt, setRemindAt] = useState("");
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -65,10 +73,13 @@ export default function TaskList({
       title: title.trim(),
       due_date: due || null,
       priority,
+      remind_at: remindAt ? new Date(remindAt).toISOString() : null,
     });
     setTitle("");
     setDue("");
     setPriority("medium");
+    setRemindAt("");
+    setShowReminder(false);
   }
 
   const open = tasks.filter((t) => t.status !== "done");
@@ -128,6 +139,26 @@ export default function TaskList({
             </option>
           ))}
         </select>
+        <button
+          type="button"
+          onClick={() => setShowReminder((v) => !v)}
+          title="Add a reminder"
+          className={`text-sm px-2.5 py-1.5 rounded-lg border transition ${
+            showReminder || remindAt
+              ? "border-design bg-design-50 dark:bg-design/15 text-design dark:text-design-400"
+              : "border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:border-slate-300"
+          }`}
+        >
+          🔔
+        </button>
+        {showReminder && (
+          <input
+            type="datetime-local"
+            value={remindAt}
+            onChange={(e) => setRemindAt(e.target.value)}
+            className={`text-sm ${inputCls}`}
+          />
+        )}
         <button type="submit" className={`rounded-lg text-white px-4 py-1.5 text-sm font-medium transition ${SCOPE_BTN[scope]}`}>
           Add Task
         </button>
@@ -206,8 +237,12 @@ function TaskRow({
         <p className={`text-sm ${isDone ? "line-through text-slate-400 dark:text-slate-500" : "text-slate-800 dark:text-slate-100"}`}>
           {task.title}
         </p>
-        {task.due_date && (
-          <p className="text-xs text-slate-400 dark:text-slate-500">Due {new Date(task.due_date).toLocaleDateString()}</p>
+        {(task.due_date || task.remind_at) && (
+          <p className="text-xs text-slate-400 dark:text-slate-500">
+            {task.due_date && <>Due {new Date(task.due_date).toLocaleDateString()}</>}
+            {task.due_date && task.remind_at && " · "}
+            {task.remind_at && <>🔔 {new Date(task.remind_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</>}
+          </p>
         )}
       </div>
       <PriorityBadge priority={task.priority} />

@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   due_date DATE,
   priority TEXT NOT NULL DEFAULT 'medium',
   status TEXT NOT NULL DEFAULT 'todo',
+  remind_at TIMESTAMPTZ, -- browser notification fires at/after this instant
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -30,8 +31,9 @@ CREATE TABLE IF NOT EXISTS design_orders (
   design_type TEXT NOT NULL DEFAULT 'Jersey', -- Logo / Jersey / Uniform
   client_name TEXT NOT NULL,
   contact TEXT, -- phone number or WhatsApp group link
-  sponsor TEXT,
+  sponsor TEXT, -- deprecated single-sponsor fields, kept for old rows
   sponsor_logo_url TEXT,
+  sponsors JSONB NOT NULL DEFAULT '[]', -- current multi-sponsor list: [{name, logo_url}, ...]
   description TEXT, -- "Other relevant information"
   logo_url TEXT,
   priority TEXT NOT NULL DEFAULT 'medium',
@@ -41,11 +43,17 @@ CREATE TABLE IF NOT EXISTS design_orders (
   needs_shorts BOOLEAN NOT NULL DEFAULT false,
   needs_tracksuit BOOLEAN NOT NULL DEFAULT false,
   needs_skirt BOOLEAN NOT NULL DEFAULT false,
+  needs_numbering BOOLEAN NOT NULL DEFAULT false, -- Yes/No — gates the number_* fields below
   number_front TEXT,
   number_back TEXT,
   number_shorts TEXT,
   neck_type TEXT,
-  sleeve_type TEXT,
+  sleeve_type TEXT, -- deprecated single value, kept for old rows
+  sleeve_types TEXT[] NOT NULL DEFAULT '{}', -- current multi-select sleeve types
+  role_player BOOLEAN NOT NULL DEFAULT false, -- required when design_type = 'Jersey'
+  role_keeper BOOLEAN NOT NULL DEFAULT false,
+  role_libero BOOLEAN NOT NULL DEFAULT false,
+  role_official BOOLEAN NOT NULL DEFAULT false,
   reference_notes TEXT, -- "ideal design" / reference & inspiration notes
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -68,5 +76,6 @@ CREATE TABLE IF NOT EXISTS events (
   title TEXT NOT NULL,
   date DATE NOT NULL,
   time TEXT,
-  notes TEXT
+  notes TEXT,
+  remind_at TIMESTAMPTZ -- browser notification fires at/after this instant
 );

@@ -5,7 +5,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   await ensureSchema();
   const id = Number(params.id);
   const body = await req.json();
-  const fields = ["title", "notes", "due_date", "priority", "status", "profile"] as const;
+  const fields = ["title", "notes", "due_date", "priority", "status", "profile", "remind_at"] as const;
   const updates: string[] = [];
   const values: unknown[] = [];
   let i = 1;

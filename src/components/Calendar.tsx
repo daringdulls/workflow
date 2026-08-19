@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Profile } from "@/lib/types";
+import { Profile, REMINDER_OFFSETS } from "@/lib/types";
 import { PROFILE_META } from "./ProfileTabs";
 
 export interface CalItem {
@@ -10,6 +10,7 @@ export interface CalItem {
   title: string;
   profile: Profile;
   kind: "task" | "design" | "freelance" | "event";
+  hasReminder?: boolean;
 }
 
 const DOT: Record<Profile, string> = {
@@ -64,12 +65,14 @@ export default function Calendar({
 }: {
   items: CalItem[];
   scope: Profile | "all";
-  onAddEvent: (title: string, date: string) => void;
+  onAddEvent: (title: string, date: string, time?: string | null, remindOffsetMinutes?: number | null) => void;
 }) {
   const today = new Date();
   const [cursor, setCursor] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selected, setSelected] = useState(toISODate(today));
   const [newTitle, setNewTitle] = useState("");
+  const [newTime, setNewTime] = useState("");
+  const [remindOffset, setRemindOffset] = useState<string>("");
 
   const itemsByDate = useMemo(() => {
     const map: Record<string, CalItem[]> = {};
@@ -122,8 +125,10 @@ export default function Calendar({
   function addEvent(e: React.FormEvent) {
     e.preventDefault();
     if (!newTitle.trim()) return;
-    onAddEvent(newTitle.trim(), selected);
+    onAddEvent(newTitle.trim(), selected, newTime || null, remindOffset === "" ? null : Number(remindOffset));
     setNewTitle("");
+    setNewTime("");
+    setRemindOffset("");
   }
 
   const selectCls =
@@ -235,19 +240,40 @@ export default function Calendar({
             <div key={it.id} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
               <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${DOT[it.profile]}`} />
               <span>{it.title}</span>
+              {it.hasReminder && <span title="Reminder set">🔔</span>}
               <span className="text-xs text-slate-400 dark:text-slate-500">
                 ({PROFILE_META[it.profile]?.label ?? it.profile})
               </span>
             </div>
           ))}
         </div>
-        <form onSubmit={addEvent} className="flex gap-2">
+        <form onSubmit={addEvent} className="flex flex-wrap gap-2">
           <input
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
             placeholder="Add note / meeting for this day…"
-            className="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500"
+            className="flex-1 min-w-[160px] rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500"
           />
+          <input
+            type="time"
+            value={newTime}
+            onChange={(e) => setNewTime(e.target.value)}
+            className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1.5 text-sm text-slate-800 dark:text-slate-100"
+          />
+          <select
+            value={remindOffset}
+            onChange={(e) => setRemindOffset(e.target.value)}
+            disabled={!newTime}
+            title={newTime ? "Remind me" : "Set a time to enable reminders"}
+            className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1.5 text-sm text-slate-800 dark:text-slate-100 disabled:opacity-40"
+          >
+            <option value="">No reminder</option>
+            {REMINDER_OFFSETS.map((o) => (
+              <option key={o.value} value={o.value}>
+                🔔 {o.label}
+              </option>
+            ))}
+          </select>
           <button type="submit" className={`rounded-lg text-white px-3 py-1.5 text-sm font-medium ${SCOPE_ACCENT[scope]}`}>
             Add
           </button>
