@@ -40,6 +40,7 @@ export default function DesignBoard({
   const [priority, setPriority] = useState<Priority>("medium");
   const [due, setDue] = useState("");
   const [shareCopied, setShareCopied] = useState(false);
+  const [selected, setSelected] = useState<DesignOrder | null>(null);
   const inputCls =
     "rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500";
 
@@ -114,6 +115,7 @@ export default function DesignBoard({
       </div>
       <p className="text-xs text-slate-400 dark:text-slate-500 mb-4">
         Share the request form with your design staff so they can submit orders directly into this pipeline — no login needed.
+        Click any card below to see its full details.
       </p>
 
       {adding && (
@@ -186,7 +188,13 @@ export default function DesignBoard({
                 {colOrders.map((o) => (
                   <div
                     key={o.id}
-                    className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 p-3 shadow-card hover:shadow-card-hover transition"
+                    onClick={() => setSelected(o)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") setSelected(o);
+                    }}
+                    className="cursor-pointer bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 p-3 shadow-card hover:shadow-card-hover hover:border-design-200 dark:hover:border-design/40 transition"
                   >
                     <div className="flex items-start gap-2 mb-1.5">
                       {o.logo_url ? (
@@ -220,30 +228,44 @@ export default function DesignBoard({
                       {o.client_name}
                       {o.sponsor ? <span className="text-slate-400 dark:text-slate-500"> · Sponsor: {o.sponsor}</span> : null}
                     </p>
-                    {o.description && <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">{o.description}</p>}
-                    {o.due_date && (
+                    {o.description && <p className="text-xs text-slate-500 dark:text-slate-400 mb-2 line-clamp-2">{o.description}</p>}
+                    {(o.requested_date || o.due_date) && (
                       <p className="text-xs text-slate-400 dark:text-slate-500 mb-2">
-                        Due {new Date(o.due_date).toLocaleDateString()}
+                        {o.requested_date && <>Requested {new Date(o.requested_date).toLocaleDateString()}</>}
+                        {o.requested_date && o.due_date && " · "}
+                        {o.due_date && <>Due {new Date(o.due_date).toLocaleDateString()}</>}
                       </p>
                     )}
                     <div className="flex items-center justify-between">
                       <div className="flex gap-1">
                         <button
                           disabled={col.key === "new"}
-                          onClick={() => move(o, -1)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            move(o, -1);
+                          }}
                           className="text-xs px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-30"
                         >
                           ←
                         </button>
                         <button
                           disabled={col.key === "delivered"}
-                          onClick={() => move(o, 1)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            move(o, 1);
+                          }}
                           className="text-xs px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-30"
                         >
                           →
                         </button>
                       </div>
-                      <button onClick={() => onDelete(o.id)} className="text-slate-300 dark:text-slate-600 hover:text-red-500 text-sm">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDelete(o.id);
+                        }}
+                        className="text-slate-300 dark:text-slate-600 hover:text-red-500 text-sm"
+                      >
                         ×
                       </button>
                     </div>
@@ -254,6 +276,161 @@ export default function DesignBoard({
             </div>
           );
         })}
+      </div>
+
+      {selected && (
+        <OrderDetailModal
+          order={selected}
+          onClose={() => setSelected(null)}
+          onUpdate={(patch) => {
+            onUpdate(selected.id, patch);
+            setSelected((prev) => (prev ? { ...prev, ...patch } : prev));
+          }}
+          onDelete={() => {
+            onDelete(selected.id);
+            setSelected(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+const STATUS_LABEL: Record<DesignStatus, string> = {
+  new: "New",
+  in_progress: "In Progress",
+  review: "Review",
+  delivered: "Delivered",
+};
+
+function OrderDetailModal({
+  order,
+  onClose,
+  onUpdate,
+  onDelete,
+}: {
+  order: DesignOrder;
+  onClose: () => void;
+  onUpdate: (patch: Partial<DesignOrder>) => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl p-6">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-200 transition"
+          aria-label="Close"
+        >
+          ×
+        </button>
+
+        <div className="flex items-start gap-4 mb-5 pr-8">
+          {order.logo_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={order.logo_url}
+              alt=""
+              className="h-16 w-16 rounded-lg object-contain bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 shrink-0"
+            />
+          ) : (
+            <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-design-50 dark:bg-design/15 text-design dark:text-design-400">
+              <svg viewBox="0 0 24 24" fill="none" className="h-7 w-7">
+                <path
+                  d="M4 16l4.5-6 3.5 4 2.5-3L20 16M4 6h16v12H4V6Z"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </span>
+          )}
+          <div className="flex-1 min-w-0 pt-1">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 leading-tight">
+              {order.order_name || "Untitled order"}
+            </h3>
+            <p className="text-sm text-design dark:text-design-400 mt-0.5">{order.order_type}</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 mb-5">
+          <div>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mb-0.5">Client / team</p>
+            <p className="text-sm text-slate-800 dark:text-slate-100">{order.client_name}</p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mb-0.5">Sponsor</p>
+            <p className="text-sm text-slate-800 dark:text-slate-100">{order.sponsor || "—"}</p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mb-0.5">Requested date</p>
+            <p className="text-sm text-slate-800 dark:text-slate-100">
+              {order.requested_date ? new Date(order.requested_date).toLocaleDateString() : "—"}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mb-0.5">Delivery date</p>
+            <p className="text-sm text-slate-800 dark:text-slate-100">
+              {order.due_date ? new Date(order.due_date).toLocaleDateString() : "—"}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mb-0.5">Priority</p>
+            <PriorityBadge priority={order.priority} />
+          </div>
+          <div>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mb-0.5">Submitted</p>
+            <p className="text-sm text-slate-800 dark:text-slate-100">{new Date(order.created_at).toLocaleString()}</p>
+          </div>
+        </div>
+
+        {order.description && (
+          <div className="mb-5">
+            <p className="text-xs text-slate-400 dark:text-slate-500 mb-1">Other relevant information</p>
+            <p className="text-sm text-slate-700 dark:text-slate-200 whitespace-pre-wrap bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3">
+              {order.description}
+            </p>
+          </div>
+        )}
+
+        {order.logo_url && (
+          <a
+            href={order.logo_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-sm text-design dark:text-design-400 hover:underline mb-5"
+          >
+            Open full-size logo
+            <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5">
+              <path d="M7 17 17 7M9 7h8v8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </a>
+        )}
+
+        <div className="flex items-center justify-between gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+          <div>
+            <label className="text-xs text-slate-400 dark:text-slate-500 mb-1 block">Status</label>
+            <select
+              value={order.status}
+              onChange={(e) => onUpdate({ status: e.target.value as DesignStatus })}
+              className="text-sm font-medium rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-100 px-2.5 py-1.5"
+            >
+              {Object.entries(STATUS_LABEL).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            onClick={onDelete}
+            className="text-sm font-medium text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg px-3 py-1.5 transition"
+          >
+            Delete order
+          </button>
+        </div>
       </div>
     </div>
   );
