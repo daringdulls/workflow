@@ -24,17 +24,29 @@ CREATE TABLE IF NOT EXISTS tasks (
 );
 
 CREATE TABLE IF NOT EXISTS design_orders (
-  id SERIAL PRIMARY KEY,
+  id SERIAL PRIMARY KEY, -- also doubles as the auto order number (see formatOrderNumber())
   order_name TEXT NOT NULL DEFAULT '',
   order_type TEXT NOT NULL DEFAULT 'Other',
+  design_type TEXT NOT NULL DEFAULT 'Jersey', -- Logo / Jersey / Uniform
   client_name TEXT NOT NULL,
+  contact TEXT, -- phone number or WhatsApp group link
   sponsor TEXT,
+  sponsor_logo_url TEXT,
   description TEXT, -- "Other relevant information"
   logo_url TEXT,
   priority TEXT NOT NULL DEFAULT 'medium',
   status TEXT NOT NULL DEFAULT 'new',
   requested_date DATE,
   due_date DATE, -- delivery date
+  needs_shorts BOOLEAN NOT NULL DEFAULT false,
+  needs_tracksuit BOOLEAN NOT NULL DEFAULT false,
+  needs_skirt BOOLEAN NOT NULL DEFAULT false,
+  number_front TEXT,
+  number_back TEXT,
+  number_shorts TEXT,
+  neck_type TEXT,
+  sleeve_type TEXT,
+  reference_notes TEXT, -- "ideal design" / reference & inspiration notes
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

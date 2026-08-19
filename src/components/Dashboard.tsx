@@ -104,7 +104,9 @@ export default function Dashboard() {
   async function addOrder(o: {
     order_name: string;
     order_type: string;
+    design_type: string;
     client_name: string;
+    contact: string;
     sponsor: string;
     description: string;
     priority: DesignOrder["priority"];
@@ -215,8 +217,12 @@ export default function Dashboard() {
           o.client_name.toLowerCase().includes(q) ||
           (o.order_name ?? "").toLowerCase().includes(q) ||
           (o.order_type ?? "").toLowerCase().includes(q) ||
+          (o.design_type ?? "").toLowerCase().includes(q) ||
+          (o.contact ?? "").toLowerCase().includes(q) ||
           (o.sponsor ?? "").toLowerCase().includes(q) ||
-          (o.description ?? "").toLowerCase().includes(q)
+          (o.description ?? "").toLowerCase().includes(q) ||
+          (o.reference_notes ?? "").toLowerCase().includes(q) ||
+          String(o.id).includes(q)
       )
     : orders;
   const searchedProjects = q

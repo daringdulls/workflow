@@ -90,6 +90,22 @@ export async function ensureSchema() {
   await sql`ALTER TABLE design_orders ADD COLUMN IF NOT EXISTS logo_url TEXT;`;
   await sql`ALTER TABLE design_orders ADD COLUMN IF NOT EXISTS requested_date DATE;`;
 
+  // Added for the richer sportswear/jersey order-request form: contact info,
+  // a separate sponsor-logo upload, design type, garment pieces needed,
+  // jersey numbering, neck/sleeve style, and reference/"ideal design" notes.
+  await sql`ALTER TABLE design_orders ADD COLUMN IF NOT EXISTS contact TEXT;`;
+  await sql`ALTER TABLE design_orders ADD COLUMN IF NOT EXISTS sponsor_logo_url TEXT;`;
+  await sql`ALTER TABLE design_orders ADD COLUMN IF NOT EXISTS design_type TEXT NOT NULL DEFAULT 'Jersey';`;
+  await sql`ALTER TABLE design_orders ADD COLUMN IF NOT EXISTS needs_shorts BOOLEAN NOT NULL DEFAULT false;`;
+  await sql`ALTER TABLE design_orders ADD COLUMN IF NOT EXISTS needs_tracksuit BOOLEAN NOT NULL DEFAULT false;`;
+  await sql`ALTER TABLE design_orders ADD COLUMN IF NOT EXISTS needs_skirt BOOLEAN NOT NULL DEFAULT false;`;
+  await sql`ALTER TABLE design_orders ADD COLUMN IF NOT EXISTS number_front TEXT;`;
+  await sql`ALTER TABLE design_orders ADD COLUMN IF NOT EXISTS number_back TEXT;`;
+  await sql`ALTER TABLE design_orders ADD COLUMN IF NOT EXISTS number_shorts TEXT;`;
+  await sql`ALTER TABLE design_orders ADD COLUMN IF NOT EXISTS neck_type TEXT;`;
+  await sql`ALTER TABLE design_orders ADD COLUMN IF NOT EXISTS sleeve_type TEXT;`;
+  await sql`ALTER TABLE design_orders ADD COLUMN IF NOT EXISTS reference_notes TEXT;`;
+
   await sql`
     CREATE TABLE IF NOT EXISTS freelance_projects (
       id SERIAL PRIMARY KEY,

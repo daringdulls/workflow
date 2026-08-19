@@ -1,13 +1,19 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ORDER_TYPES, Priority } from "@/lib/types";
+import { DESIGN_TYPES, NECK_TYPES, ORDER_TYPES, Priority, SLEEVE_TYPES, formatOrderNumber } from "@/lib/types";
 
 const PRIORITY_OPTIONS: { value: Priority; label: string; dot: string }[] = [
   { value: "low", label: "Low", dot: "bg-slate-400" },
   { value: "medium", label: "Medium", dot: "bg-amber-500" },
   { value: "high", label: "High", dot: "bg-orange-500" },
   { value: "urgent", label: "Urgent", dot: "bg-red-500" },
+];
+
+const GARMENT_OPTIONS: { key: "shorts" | "tracksuit" | "skirt"; label: string }[] = [
+  { key: "shorts", label: "Shorts" },
+  { key: "tracksuit", label: "Track suit" },
+  { key: "skirt", label: "Skirt" },
 ];
 
 function todayISO() {
@@ -18,39 +24,152 @@ function todayISO() {
   return `${y}-${m}-${day}`;
 }
 
+function SectionHeader({ step, title, subtitle }: { step: number; title: string; subtitle?: string }) {
+  return (
+    <div className="flex items-center gap-3 mb-4">
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-design text-white text-xs font-semibold">
+        {step}
+      </span>
+      <div>
+        <h2 className="text-sm font-semibold text-slate-800">{title}</h2>
+        {subtitle && <p className="text-xs text-slate-400">{subtitle}</p>}
+      </div>
+    </div>
+  );
+}
+
+function ImageDrop({
+  label,
+  hint,
+  file,
+  preview,
+  onPick,
+  onClear,
+}: {
+  label: string;
+  hint: string;
+  file: File | null;
+  preview: string | null;
+  onPick: (f: File | null) => void;
+  onClear: () => void;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  return (
+    <div>
+      <label className="block text-sm font-medium text-slate-700 mb-1.5">{label}</label>
+      {preview ? (
+        <div className="flex items-center gap-3 rounded-xl border border-slate-200 p-3 bg-slate-50/60">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={preview} alt="Preview" className="h-14 w-14 rounded-lg object-contain bg-white border border-slate-100" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-slate-700 truncate">{file?.name}</p>
+            <p className="text-xs text-slate-400">{file ? Math.round(file.size / 1024) : 0} KB</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              onClear();
+              if (ref.current) ref.current.value = "";
+            }}
+            className="text-slate-400 hover:text-red-500 text-sm px-2"
+          >
+            Remove
+          </button>
+        </div>
+      ) : (
+        <label className="flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-slate-200 py-5 text-center cursor-pointer hover:border-design-300 hover:bg-design-50/40 hover:text-design transition text-slate-400">
+          <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
+            <path
+              d="M12 16V4m0 0 4 4m-4-4-4 4M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"
+              stroke="currentColor"
+              strokeWidth="1.7"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <span className="text-xs font-medium">{hint}</span>
+          <span className="text-[11px] text-slate-400">PNG, JPG, WEBP, SVG or GIF — up to 8MB</span>
+          <input
+            ref={ref}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif"
+            className="hidden"
+            onChange={(e) => onPick(e.target.files?.[0] ?? null)}
+          />
+        </label>
+      )}
+    </div>
+  );
+}
+
 export default function RequestPage() {
   const [orderName, setOrderName] = useState("");
   const [orderType, setOrderType] = useState<string>(ORDER_TYPES[0]);
+  const [designType, setDesignType] = useState<string>(DESIGN_TYPES[1]);
   const [clientName, setClientName] = useState("");
+  const [contact, setContact] = useState("");
   const [sponsor, setSponsor] = useState("");
   const [requestedDate, setRequestedDate] = useState(todayISO());
   const [dueDate, setDueDate] = useState("");
   const [priority, setPriority] = useState<Priority>("medium");
   const [description, setDescription] = useState("");
+  const [referenceNotes, setReferenceNotes] = useState("");
+  const [neckType, setNeckType] = useState("");
+  const [sleeveType, setSleeveType] = useState("");
+  const [garments, setGarments] = useState<Set<string>>(new Set());
+  const [numberFront, setNumberFront] = useState("");
+  const [numberBack, setNumberBack] = useState("");
+  const [numberShorts, setNumberShorts] = useState("");
+
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [sponsorLogoFile, setSponsorLogoFile] = useState<File | null>(null);
+  const [sponsorLogoPreview, setSponsorLogoPreview] = useState<string | null>(null);
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [orderNumber, setOrderNumber] = useState<string | null>(null);
 
   function pickLogo(file: File | null) {
     setLogoFile(file);
     if (logoPreview) URL.revokeObjectURL(logoPreview);
     setLogoPreview(file ? URL.createObjectURL(file) : null);
   }
+  function pickSponsorLogo(file: File | null) {
+    setSponsorLogoFile(file);
+    if (sponsorLogoPreview) URL.revokeObjectURL(sponsorLogoPreview);
+    setSponsorLogoPreview(file ? URL.createObjectURL(file) : null);
+  }
+  function toggleGarment(key: string) {
+    setGarments((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
 
   function resetForm() {
     setOrderName("");
     setOrderType(ORDER_TYPES[0]);
+    setDesignType(DESIGN_TYPES[1]);
     setClientName("");
+    setContact("");
     setSponsor("");
     setRequestedDate(todayISO());
     setDueDate("");
     setPriority("medium");
     setDescription("");
+    setReferenceNotes("");
+    setNeckType("");
+    setSleeveType("");
+    setGarments(new Set());
+    setNumberFront("");
+    setNumberBack("");
+    setNumberShorts("");
     pickLogo(null);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    pickSponsorLogo(null);
   }
 
   async function submit(e: React.FormEvent) {
@@ -65,19 +184,32 @@ export default function RequestPage() {
       const fd = new FormData();
       fd.set("order_name", orderName.trim());
       fd.set("order_type", orderType);
+      fd.set("design_type", designType);
       fd.set("client_name", clientName.trim());
+      fd.set("contact", contact.trim());
       fd.set("sponsor", sponsor.trim());
       fd.set("requested_date", requestedDate);
       fd.set("due_date", dueDate);
       fd.set("priority", priority);
       fd.set("description", description.trim());
+      fd.set("reference_notes", referenceNotes.trim());
+      fd.set("neck_type", neckType);
+      fd.set("sleeve_type", sleeveType);
+      fd.set("needs_shorts", String(garments.has("shorts")));
+      fd.set("needs_tracksuit", String(garments.has("tracksuit")));
+      fd.set("needs_skirt", String(garments.has("skirt")));
+      fd.set("number_front", numberFront.trim());
+      fd.set("number_back", numberBack.trim());
+      fd.set("number_shorts", numberShorts.trim());
       if (logoFile) fd.set("logo", logoFile);
+      if (sponsorLogoFile) fd.set("sponsor_logo", sponsorLogoFile);
 
       const res = await fetch("/api/public/design-requests", { method: "POST", body: fd });
+      const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
         throw new Error(body.error || "Something went wrong submitting your request.");
       }
+      setOrderNumber(typeof body.id === "number" ? formatOrderNumber(body.id) : null);
       setDone(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
@@ -87,12 +219,13 @@ export default function RequestPage() {
   }
 
   const inputCls =
-    "w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-design-400 focus:border-design-400 transition";
+    "w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-design-400 focus:border-design-400 transition";
   const labelCls = "block text-sm font-medium text-slate-700 mb-1.5";
+  const cardCls = "bg-white rounded-2xl border border-slate-200/80 shadow-card p-5 sm:p-6";
 
   if (done) {
     return (
-      <div className="min-h-screen bg-[#f6f7f9] flex items-center justify-center px-4 py-12">
+      <div className="min-h-screen bg-gradient-to-b from-design-50/60 to-[#f6f7f9] flex items-center justify-center px-4 py-12">
         <div className="w-full max-w-md bg-white rounded-2xl border border-slate-200/80 shadow-card p-8 text-center">
           <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-design-50 text-design mb-4">
             <svg viewBox="0 0 24 24" fill="none" className="h-7 w-7">
@@ -100,6 +233,11 @@ export default function RequestPage() {
             </svg>
           </span>
           <h1 className="text-lg font-semibold text-slate-900 mb-1.5">Request submitted</h1>
+          {orderNumber && (
+            <p className="inline-block text-xs font-mono font-semibold tracking-wide text-design bg-design-50 rounded-full px-3 py-1 mb-3">
+              {orderNumber}
+            </p>
+          )}
           <p className="text-sm text-slate-500 mb-6">
             Thanks — your design request has landed in the pipeline. The team will pick it up shortly.
           </p>
@@ -108,7 +246,7 @@ export default function RequestPage() {
               resetForm();
               setDone(false);
             }}
-            className="w-full rounded-lg bg-design hover:bg-design-700 text-white font-medium py-2.5 transition"
+            className="w-full rounded-xl bg-design hover:bg-design-700 text-white font-semibold py-3 shadow-sm transition"
           >
             Submit another request
           </button>
@@ -118,7 +256,7 @@ export default function RequestPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f6f7f9] px-4 py-10 sm:py-14">
+    <div className="min-h-screen bg-gradient-to-b from-design-50/60 to-[#f6f7f9] px-4 py-10 sm:py-14">
       <div className="mx-auto w-full max-w-2xl">
         <div className="flex items-center gap-3 mb-8">
           <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-hotel via-design to-freelance text-white font-bold shadow-card">
@@ -130,161 +268,271 @@ export default function RequestPage() {
           </div>
         </div>
 
-        <form onSubmit={submit} className="bg-white rounded-2xl border border-slate-200/80 shadow-card p-6 sm:p-8 space-y-6">
-          <div className="grid sm:grid-cols-2 gap-5">
-            <div>
-              <label className={labelCls}>
-                Order name <span className="text-red-500">*</span>
-              </label>
-              <input
-                value={orderName}
-                onChange={(e) => setOrderName(e.target.value)}
-                placeholder="e.g. Home Jersey — Blue Marlins FC"
-                className={inputCls}
-                required
-              />
-            </div>
-            <div>
-              <label className={labelCls}>
-                Type of order <span className="text-red-500">*</span>
-              </label>
-              <select value={orderType} onChange={(e) => setOrderType(e.target.value)} className={inputCls}>
-                {ORDER_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-5">
-            <div>
-              <label className={labelCls}>
-                Client / team name <span className="text-red-500">*</span>
-              </label>
-              <input
-                value={clientName}
-                onChange={(e) => setClientName(e.target.value)}
-                placeholder="Who is this order for?"
-                className={inputCls}
-                required
-              />
-            </div>
-            <div>
-              <label className={labelCls}>Sponsor (if any)</label>
-              <input
-                value={sponsor}
-                onChange={(e) => setSponsor(e.target.value)}
-                placeholder="Sponsor / featured brand"
-                className={inputCls}
-              />
-            </div>
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-5">
-            <div>
-              <label className={labelCls}>Requested date</label>
-              <input
-                type="date"
-                value={requestedDate}
-                onChange={(e) => setRequestedDate(e.target.value)}
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className={labelCls}>
-                Delivery date needed <span className="text-red-500">*</span>
-              </label>
-              <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={inputCls} required />
-            </div>
-          </div>
-
-          <div>
-            <label className={labelCls}>Priority level</label>
-            <div className="grid grid-cols-4 gap-2">
-              {PRIORITY_OPTIONS.map((p) => (
-                <button
-                  key={p.value}
-                  type="button"
-                  onClick={() => setPriority(p.value)}
-                  className={`flex items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-sm font-medium transition ${
-                    priority === p.value
-                      ? "border-design bg-design-50 text-design-700"
-                      : "border-slate-200 text-slate-500 hover:border-slate-300"
-                  }`}
-                >
-                  <span className={`h-1.5 w-1.5 rounded-full ${p.dot}`} />
-                  {p.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className={labelCls}>Logo / reference image</label>
-            {logoPreview ? (
-              <div className="flex items-center gap-3 rounded-lg border border-slate-200 p-3">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={logoPreview} alt="Logo preview" className="h-14 w-14 rounded object-contain bg-slate-50 border border-slate-100" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-slate-700 truncate">{logoFile?.name}</p>
-                  <p className="text-xs text-slate-400">{logoFile ? Math.round(logoFile.size / 1024) : 0} KB</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    pickLogo(null);
-                    if (fileInputRef.current) fileInputRef.current.value = "";
-                  }}
-                  className="text-slate-400 hover:text-red-500 text-sm px-2"
-                >
-                  Remove
-                </button>
-              </div>
-            ) : (
-              <label className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-200 py-6 text-center cursor-pointer hover:border-design-300 hover:text-design transition text-slate-400">
-                <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6">
-                  <path
-                    d="M12 16V4m0 0 4 4m-4-4-4 4M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"
-                    stroke="currentColor"
-                    strokeWidth="1.7"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                <span className="text-sm">Click to upload a logo or reference image</span>
-                <span className="text-xs text-slate-400">PNG, JPG, WEBP, SVG or GIF — up to 8MB</span>
+        <form onSubmit={submit} className="space-y-4">
+          {/* 1. Order basics */}
+          <div className={cardCls}>
+            <SectionHeader step={1} title="Order details" subtitle="What are we making, and by when?" />
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="sm:col-span-2">
+                <label className={labelCls}>
+                  Order name <span className="text-red-500">*</span>
+                </label>
                 <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif"
-                  className="hidden"
-                  onChange={(e) => pickLogo(e.target.files?.[0] ?? null)}
+                  value={orderName}
+                  onChange={(e) => setOrderName(e.target.value)}
+                  placeholder="e.g. Home Jersey — Blue Marlins FC"
+                  className={inputCls}
+                  required
                 />
-              </label>
-            )}
+              </div>
+              <div>
+                <label className={labelCls}>
+                  Order type <span className="text-red-500">*</span>
+                </label>
+                <select value={orderType} onChange={(e) => setOrderType(e.target.value)} className={inputCls}>
+                  {ORDER_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Design type</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {DESIGN_TYPES.map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setDesignType(t)}
+                      className={`rounded-lg border px-2 py-2.5 text-sm font-medium transition ${
+                        designType === t
+                          ? "border-design bg-design-50 text-design-700"
+                          : "border-slate-200 text-slate-500 hover:border-slate-300"
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className={labelCls}>Requested date</label>
+                <input
+                  type="date"
+                  value={requestedDate}
+                  onChange={(e) => setRequestedDate(e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>
+                  Expected delivery date <span className="text-red-500">*</span>
+                </label>
+                <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={inputCls} required />
+              </div>
+              <div className="sm:col-span-2">
+                <label className={labelCls}>Priority level</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {PRIORITY_OPTIONS.map((p) => (
+                    <button
+                      key={p.value}
+                      type="button"
+                      onClick={() => setPriority(p.value)}
+                      className={`flex items-center justify-center gap-1.5 rounded-lg border px-2 py-2.5 text-sm font-medium transition ${
+                        priority === p.value
+                          ? "border-design bg-design-50 text-design-700"
+                          : "border-slate-200 text-slate-500 hover:border-slate-300"
+                      }`}
+                    >
+                      <span className={`h-1.5 w-1.5 rounded-full ${p.dot}`} />
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div>
-            <label className={labelCls}>Other relevant information</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Sizes, colors, quantities, placement notes, deadlines to know about…"
-              rows={4}
-              className={`${inputCls} resize-none`}
-            />
+          {/* 2. Contact */}
+          <div className={cardCls}>
+            <SectionHeader step={2} title="Client & contact" subtitle="Who is this order for, and how do we reach them?" />
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <label className={labelCls}>
+                  Client / team name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  value={clientName}
+                  onChange={(e) => setClientName(e.target.value)}
+                  placeholder="Who is this order for?"
+                  className={inputCls}
+                  required
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Contact / WhatsApp group link</label>
+                <input
+                  value={contact}
+                  onChange={(e) => setContact(e.target.value)}
+                  placeholder="Phone number or WhatsApp group link"
+                  className={inputCls}
+                />
+              </div>
+            </div>
           </div>
 
-          {error && (
-            <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>
-          )}
+          {/* 3. Sponsor & logos */}
+          <div className={cardCls}>
+            <SectionHeader step={3} title="Sponsor & artwork" subtitle="Upload the logo(s) we should print" />
+            <div className="grid sm:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className={labelCls}>Sponsor (if any)</label>
+                <input
+                  value={sponsor}
+                  onChange={(e) => setSponsor(e.target.value)}
+                  placeholder="Sponsor / featured brand"
+                  className={inputCls}
+                />
+              </div>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <ImageDrop
+                label="Logo"
+                hint="Click to upload the main logo"
+                file={logoFile}
+                preview={logoPreview}
+                onPick={pickLogo}
+                onClear={() => pickLogo(null)}
+              />
+              <ImageDrop
+                label="Sponsor logo"
+                hint="Click to upload the sponsor logo"
+                file={sponsorLogoFile}
+                preview={sponsorLogoPreview}
+                onPick={pickSponsorLogo}
+                onClear={() => pickSponsorLogo(null)}
+              />
+            </div>
+          </div>
+
+          {/* 4. Garment details */}
+          <div className={cardCls}>
+            <SectionHeader step={4} title="Garment details" subtitle="Cut, pieces, and style" />
+            <div className="grid sm:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className={labelCls}>Neck type</label>
+                <select value={neckType} onChange={(e) => setNeckType(e.target.value)} className={inputCls}>
+                  <option value="">Not specified</option>
+                  {NECK_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Sleeve type</label>
+                <select value={sleeveType} onChange={(e) => setSleeveType(e.target.value)} className={inputCls}>
+                  <option value="">Not specified</option>
+                  {SLEEVE_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className={labelCls}>Additional pieces needed</label>
+              <div className="grid grid-cols-3 gap-2">
+                {GARMENT_OPTIONS.map((g) => {
+                  const active = garments.has(g.key);
+                  return (
+                    <button
+                      key={g.key}
+                      type="button"
+                      onClick={() => toggleGarment(g.key)}
+                      className={`flex items-center justify-center gap-2 rounded-lg border px-2 py-2.5 text-sm font-medium transition ${
+                        active ? "border-design bg-design-50 text-design-700" : "border-slate-200 text-slate-500 hover:border-slate-300"
+                      }`}
+                    >
+                      <span
+                        className={`flex h-4 w-4 items-center justify-center rounded border ${
+                          active ? "bg-design border-design text-white" : "border-slate-300"
+                        }`}
+                      >
+                        {active && (
+                          <svg viewBox="0 0 24 24" fill="none" className="h-3 w-3">
+                            <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                      </span>
+                      {g.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* 5. Numbering */}
+          <div className={cardCls}>
+            <SectionHeader step={5} title="Numbering" subtitle="Leave blank if this order doesn't need numbers" />
+            <div className="grid sm:grid-cols-3 gap-4">
+              <div>
+                <label className={labelCls}>Front number</label>
+                <input value={numberFront} onChange={(e) => setNumberFront(e.target.value)} placeholder="e.g. 9" className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Back number</label>
+                <input value={numberBack} onChange={(e) => setNumberBack(e.target.value)} placeholder="e.g. 9" className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Shorts number (if any)</label>
+                <input
+                  value={numberShorts}
+                  onChange={(e) => setNumberShorts(e.target.value)}
+                  placeholder="e.g. 9"
+                  className={inputCls}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* 6. Notes */}
+          <div className={cardCls}>
+            <SectionHeader step={6} title="Design reference & notes" />
+            <div className="space-y-4">
+              <div>
+                <label className={labelCls}>Ideal design / reference</label>
+                <textarea
+                  value={referenceNotes}
+                  onChange={(e) => setReferenceNotes(e.target.value)}
+                  placeholder="Describe or link a design you'd like this to look like — style, layout, past order, etc."
+                  rows={3}
+                  className={`${inputCls} resize-none`}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Other relevant information</label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Sizes, colors, quantities, placement notes, deadlines to know about…"
+                  rows={3}
+                  className={`${inputCls} resize-none`}
+                />
+              </div>
+            </div>
+          </div>
+
+          {error && <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">{error}</p>}
 
           <button
             type="submit"
             disabled={submitting}
-            className="w-full rounded-lg bg-design hover:bg-design-700 disabled:opacity-60 text-white font-medium py-3 transition"
+            className="w-full rounded-xl bg-design hover:bg-design-700 disabled:opacity-60 text-white font-semibold py-3.5 shadow-card transition"
           >
             {submitting ? "Submitting…" : "Submit Request"}
           </button>

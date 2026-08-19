@@ -8,14 +8,26 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const fields = [
     "order_name",
     "order_type",
+    "design_type",
     "client_name",
+    "contact",
     "sponsor",
+    "sponsor_logo_url",
     "description",
     "logo_url",
     "priority",
     "status",
     "requested_date",
     "due_date",
+    "needs_shorts",
+    "needs_tracksuit",
+    "needs_skirt",
+    "number_front",
+    "number_back",
+    "number_shorts",
+    "neck_type",
+    "sleeve_type",
+    "reference_notes",
   ] as const;
   const updates: string[] = [];
   const values: unknown[] = [];
