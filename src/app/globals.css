@@ -10,11 +10,23 @@ body {
   background-color: #f6f7f9;
 }
 
+.dark body {
+  background-color: #020617;
+}
+
 ::selection {
   background-color: #cde2fb;
+}
+
+.dark ::selection {
+  background-color: #2a4a78;
 }
 
 * {
   scrollbar-width: thin;
   scrollbar-color: #cbd5e1 transparent;
+}
+
+.dark * {
+  scrollbar-color: #334155 transparent;
 }

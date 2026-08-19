@@ -19,11 +19,11 @@ const STATUS_LABEL: Record<FreelanceStatus, string> = {
 };
 
 const STATUS_COLOR: Record<FreelanceStatus, string> = {
-  lead: "bg-slate-100 text-slate-600",
-  active: "bg-freelance-50 text-freelance-700",
-  review: "bg-amber-50 text-amber-700",
-  delivered: "bg-hotel-50 text-hotel-700",
-  paid: "bg-emerald-50 text-emerald-700",
+  lead: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+  active: "bg-freelance-50 text-freelance-700 dark:bg-freelance/15 dark:text-freelance-400",
+  review: "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400",
+  delivered: "bg-hotel-50 text-hotel-700 dark:bg-hotel/15 dark:text-hotel-400",
+  paid: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400",
 };
 
 export default function FreelanceTracker({
@@ -51,6 +51,8 @@ export default function FreelanceTracker({
   const [priority, setPriority] = useState<Priority>("medium");
   const [deadline, setDeadline] = useState("");
   const [rate, setRate] = useState("");
+  const inputCls =
+    "rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500";
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -78,11 +80,11 @@ export default function FreelanceTracker({
   });
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-card p-5">
+    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-card p-5">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <span className="h-2 w-2 rounded-full bg-freelance" />
-          <h2 className="font-semibold text-slate-800">Freelance Projects</h2>
+          <h2 className="font-semibold text-slate-800 dark:text-slate-100">Freelance Projects</h2>
         </div>
         <button
           onClick={() => setAdding((v) => !v)}
@@ -93,41 +95,39 @@ export default function FreelanceTracker({
       </div>
 
       {adding && (
-        <form onSubmit={submit} className="flex flex-wrap gap-2 mb-5 bg-slate-50 rounded-xl p-3 border border-slate-100">
+        <form
+          onSubmit={submit}
+          className="flex flex-wrap gap-2 mb-5 bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 border border-slate-100 dark:border-slate-800"
+        >
           <input
             value={client}
             onChange={(e) => setClient(e.target.value)}
             placeholder="Client name"
-            className="flex-1 min-w-[120px] rounded-lg border border-slate-200 px-3 py-1.5 bg-white"
+            className={`flex-1 min-w-[120px] ${inputCls}`}
           />
           <input
             value={project}
             onChange={(e) => setProject(e.target.value)}
             placeholder="Project name"
-            className="flex-1 min-w-[120px] rounded-lg border border-slate-200 px-3 py-1.5 bg-white"
+            className={`flex-1 min-w-[120px] ${inputCls}`}
           />
           <input
             value={desc}
             onChange={(e) => setDesc(e.target.value)}
             placeholder="Scope / notes"
-            className="flex-[2] min-w-[160px] rounded-lg border border-slate-200 px-3 py-1.5 bg-white"
+            className={`flex-[2] min-w-[160px] ${inputCls}`}
           />
-          <input
-            type="date"
-            value={deadline}
-            onChange={(e) => setDeadline(e.target.value)}
-            className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm bg-white"
-          />
+          <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} className={`text-sm ${inputCls}`} />
           <input
             value={rate}
             onChange={(e) => setRate(e.target.value)}
             placeholder="Rate / budget"
-            className="w-28 rounded-lg border border-slate-200 px-2 py-1.5 text-sm bg-white"
+            className={`w-28 text-sm ${inputCls}`}
           />
           <select
             value={priority}
             onChange={(e) => setPriority(e.target.value as Priority)}
-            className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm bg-white"
+            className={`text-sm ${inputCls}`}
           >
             {PRIORITIES.map((p) => (
               <option key={p} value={p}>
@@ -143,14 +143,18 @@ export default function FreelanceTracker({
 
       <div className="space-y-2">
         {sorted.map((p) => (
-          <div key={p.id} className="rounded-xl border border-slate-200 p-3 shadow-card hover:shadow-card-hover transition">
+          <div
+            key={p.id}
+            className="rounded-xl border border-slate-200 dark:border-slate-700 p-3 shadow-card hover:shadow-card-hover transition"
+          >
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
-                <p className="text-sm font-medium text-slate-800">
-                  {p.project_name} <span className="text-slate-400 font-normal">· {p.client_name}</span>
+                <p className="text-sm font-medium text-slate-800 dark:text-slate-100">
+                  {p.project_name}{" "}
+                  <span className="text-slate-400 dark:text-slate-500 font-normal">· {p.client_name}</span>
                 </p>
-                {p.description && <p className="text-xs text-slate-500 mt-0.5">{p.description}</p>}
-                <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-400">
+                {p.description && <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{p.description}</p>}
+                <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-400 dark:text-slate-500">
                   {p.deadline && <span>Due {new Date(p.deadline).toLocaleDateString()}</span>}
                   {p.rate && <span>{p.rate}</span>}
                 </div>
@@ -168,14 +172,14 @@ export default function FreelanceTracker({
                     </option>
                   ))}
                 </select>
-                <button onClick={() => onDelete(p.id)} className="text-slate-300 hover:text-red-500 text-sm">
+                <button onClick={() => onDelete(p.id)} className="text-slate-300 dark:text-slate-600 hover:text-red-500 text-sm">
                   ×
                 </button>
               </div>
             </div>
           </div>
         ))}
-        {sorted.length === 0 && <p className="text-sm text-slate-400">No freelance projects yet.</p>}
+        {sorted.length === 0 && <p className="text-sm text-slate-400 dark:text-slate-500">No freelance projects yet.</p>}
       </div>
     </div>
   );

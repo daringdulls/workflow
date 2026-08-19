@@ -11,6 +11,8 @@ export const PROFILE_META: Record<
     ring: string;
     chipBg: string; // pale tint background for badges/pills on a LIGHT surface
     chipText: string; // readable text color for badges/pills on a LIGHT surface
+    chipDarkBg: string; // pale tint background for badges/pills on a DARK surface
+    chipDarkText: string; // readable text color for badges/pills on a DARK surface
   }
 > = {
   all: {
@@ -22,6 +24,8 @@ export const PROFILE_META: Record<
     ring: "ring-white/20",
     chipBg: "bg-slate-100",
     chipText: "text-slate-700",
+    chipDarkBg: "dark:bg-white/10",
+    chipDarkText: "dark:text-slate-200",
   },
   hotel: {
     label: "Hotel Ops",
@@ -32,6 +36,8 @@ export const PROFILE_META: Record<
     ring: "ring-hotel/30",
     chipBg: "bg-hotel-50",
     chipText: "text-hotel-700",
+    chipDarkBg: "dark:bg-hotel/15",
+    chipDarkText: "dark:text-hotel-400",
   },
   design: {
     label: "Graphic Design",
@@ -42,6 +48,8 @@ export const PROFILE_META: Record<
     ring: "ring-design/30",
     chipBg: "bg-design-50",
     chipText: "text-design-700",
+    chipDarkBg: "dark:bg-design/15",
+    chipDarkText: "dark:text-design-400",
   },
   freelance: {
     label: "Freelance",
@@ -52,6 +60,8 @@ export const PROFILE_META: Record<
     ring: "ring-freelance/30",
     chipBg: "bg-freelance-50",
     chipText: "text-freelance-700",
+    chipDarkBg: "dark:bg-freelance/15",
+    chipDarkText: "dark:text-freelance-400",
   },
   general: {
     label: "General",
@@ -62,6 +72,8 @@ export const PROFILE_META: Record<
     ring: "ring-white/20",
     chipBg: "bg-slate-100",
     chipText: "text-slate-700",
+    chipDarkBg: "dark:bg-white/10",
+    chipDarkText: "dark:text-slate-200",
   },
 };
 

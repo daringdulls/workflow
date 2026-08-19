@@ -32,6 +32,8 @@ export default function DesignBoard({
   const [desc, setDesc] = useState("");
   const [priority, setPriority] = useState<Priority>("medium");
   const [due, setDue] = useState("");
+  const inputCls =
+    "rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500";
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -51,11 +53,11 @@ export default function DesignBoard({
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-card p-5">
+    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-card p-5">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <span className="h-2 w-2 rounded-full bg-design" />
-          <h2 className="font-semibold text-slate-800">Design Requests</h2>
+          <h2 className="font-semibold text-slate-800 dark:text-slate-100">Design Requests</h2>
         </div>
         <button
           onClick={() => setAdding((v) => !v)}
@@ -66,29 +68,27 @@ export default function DesignBoard({
       </div>
 
       {adding && (
-        <form onSubmit={submit} className="flex flex-wrap gap-2 mb-5 bg-slate-50 rounded-xl p-3 border border-slate-100">
+        <form
+          onSubmit={submit}
+          className="flex flex-wrap gap-2 mb-5 bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 border border-slate-100 dark:border-slate-800"
+        >
           <input
             value={client}
             onChange={(e) => setClient(e.target.value)}
             placeholder="Client / brand name"
-            className="flex-1 min-w-[140px] rounded-lg border border-slate-200 px-3 py-1.5 bg-white"
+            className={`flex-1 min-w-[140px] ${inputCls}`}
           />
           <input
             value={desc}
             onChange={(e) => setDesc(e.target.value)}
             placeholder="What do they need?"
-            className="flex-[2] min-w-[180px] rounded-lg border border-slate-200 px-3 py-1.5 bg-white"
+            className={`flex-[2] min-w-[180px] ${inputCls}`}
           />
-          <input
-            type="date"
-            value={due}
-            onChange={(e) => setDue(e.target.value)}
-            className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm bg-white"
-          />
+          <input type="date" value={due} onChange={(e) => setDue(e.target.value)} className={`text-sm ${inputCls}`} />
           <select
             value={priority}
             onChange={(e) => setPriority(e.target.value as Priority)}
-            className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm bg-white"
+            className={`text-sm ${inputCls}`}
           >
             {PRIORITIES.map((p) => (
               <option key={p} value={p}>
@@ -106,26 +106,27 @@ export default function DesignBoard({
         {COLUMNS.map((col) => {
           const colOrders = orders.filter((o) => o.status === col.key);
           return (
-            <div key={col.key} className="bg-slate-50 rounded-xl p-3">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2 flex items-center justify-between">
+            <div key={col.key} className="bg-slate-50 dark:bg-slate-800/40 rounded-xl p-3">
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2 flex items-center justify-between">
                 <span className="flex items-center gap-1.5">
                   <span className={`h-1.5 w-1.5 rounded-full ${col.dot}`} />
                   {col.label}
                 </span>
-                <span className="text-slate-400">{colOrders.length}</span>
+                <span className="text-slate-400 dark:text-slate-500">{colOrders.length}</span>
               </p>
               <div className="space-y-2">
                 {colOrders.map((o) => (
-                  <div key={o.id} className="bg-white rounded-lg border border-slate-200 p-3 shadow-card hover:shadow-card-hover transition">
+                  <div
+                    key={o.id}
+                    className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 p-3 shadow-card hover:shadow-card-hover transition"
+                  >
                     <div className="flex items-start justify-between gap-2 mb-1">
-                      <p className="text-sm font-medium text-slate-800">{o.client_name}</p>
+                      <p className="text-sm font-medium text-slate-800 dark:text-slate-100">{o.client_name}</p>
                       <PriorityBadge priority={o.priority} />
                     </div>
-                    {o.description && (
-                      <p className="text-xs text-slate-500 mb-2">{o.description}</p>
-                    )}
+                    {o.description && <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">{o.description}</p>}
                     {o.due_date && (
-                      <p className="text-xs text-slate-400 mb-2">
+                      <p className="text-xs text-slate-400 dark:text-slate-500 mb-2">
                         Due {new Date(o.due_date).toLocaleDateString()}
                       </p>
                     )}
@@ -134,30 +135,25 @@ export default function DesignBoard({
                         <button
                           disabled={col.key === "new"}
                           onClick={() => move(o, -1)}
-                          className="text-xs px-1.5 py-0.5 rounded border border-slate-200 disabled:opacity-30"
+                          className="text-xs px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-30"
                         >
                           ←
                         </button>
                         <button
                           disabled={col.key === "delivered"}
                           onClick={() => move(o, 1)}
-                          className="text-xs px-1.5 py-0.5 rounded border border-slate-200 disabled:opacity-30"
+                          className="text-xs px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-30"
                         >
                           →
                         </button>
                       </div>
-                      <button
-                        onClick={() => onDelete(o.id)}
-                        className="text-slate-300 hover:text-red-500 text-sm"
-                      >
+                      <button onClick={() => onDelete(o.id)} className="text-slate-300 dark:text-slate-600 hover:text-red-500 text-sm">
                         ×
                       </button>
                     </div>
                   </div>
                 ))}
-                {colOrders.length === 0 && (
-                  <p className="text-xs text-slate-300 text-center py-4">Empty</p>
-                )}
+                {colOrders.length === 0 && <p className="text-xs text-slate-300 dark:text-slate-600 text-center py-4">Empty</p>}
               </div>
             </div>
           );
