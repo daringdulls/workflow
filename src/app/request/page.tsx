@@ -33,6 +33,12 @@ const STATUS_META: Record<string, { label: string; step: number }> = {
 };
 
 const TRACK_STAGES = ["Request Submitted", "In Progress", "In Review", "Delivered"];
+const STAGE_HELP = [
+  "Your request has been received and is queued for the design team.",
+  "Our designer is actively working on your artwork.",
+  "Your design is being reviewed before final delivery.",
+  "Delivered! Reach out to us if you need any changes.",
+];
 
 const WIZARD_STEPS = [
   { title: "Order Details", subtitle: "What are we making, and who is it for?" },
@@ -51,7 +57,7 @@ function todayISO() {
 
 function Stepper({ current }: { current: number }) {
   return (
-    <div className="flex items-center mb-7 sm:mb-9">
+    <div className="flex items-center mb-6 sm:mb-7">
       {WIZARD_STEPS.map((s, i) => (
         <Fragment key={s.title}>
           <div className="flex flex-col items-center gap-1.5 shrink-0">
@@ -91,7 +97,7 @@ function Stepper({ current }: { current: number }) {
 
 function StepHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
-    <div className="mb-5">
+    <div className="mb-4">
       <h2 className="text-base sm:text-lg font-semibold text-slate-900">{title}</h2>
       {subtitle && <p className="text-sm text-slate-500 mt-0.5">{subtitle}</p>}
     </div>
@@ -201,10 +207,20 @@ interface SponsorRow {
   preview: string | null;
 }
 
+function InfoTile({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="rounded-lg bg-slate-50 px-3 py-2.5">
+      <p className="text-xs text-slate-400">{label}</p>
+      <p className="text-slate-700 font-medium text-sm mt-0.5">{value}</p>
+    </div>
+  );
+}
+
 function TrackOrder() {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [result, setResult] = useState<any | null>(null);
 
@@ -226,46 +242,68 @@ function TrackOrder() {
     }
   }
 
+  function copyOrderNumber() {
+    if (!result) return;
+    navigator.clipboard?.writeText(formatOrderNumber(result.id)).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }
+
   const meta = result ? STATUS_META[result.status] ?? STATUS_META.new : null;
+  const priorityMeta = result ? PRIORITY_OPTIONS.find((p) => p.value === result.priority) : null;
+  const percent = meta ? Math.round(((meta.step + 1) / TRACK_STAGES.length) * 100) : 0;
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-card p-6 sm:p-8">
-      <p className="text-sm text-slate-500 mb-4">Enter your order number (e.g. WF-00042) to check its progress.</p>
-      <form onSubmit={submit} className="flex gap-2 mb-6">
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="WF-00042"
-          className="flex-1 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-teal-400 transition"
-        />
-        <button
-          type="submit"
-          disabled={loading}
-          className="rounded-xl bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 disabled:opacity-60 text-white font-semibold px-5 text-sm transition shadow-card"
-        >
-          {loading ? "Checking…" : "Track"}
-        </button>
-      </form>
-
-      {error && <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2 mb-4">{error}</p>}
+    <div className="space-y-5">
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-card p-6 sm:p-8">
+        <h2 className="text-base font-semibold text-slate-900 mb-1">Enter your order number to check its status</h2>
+        <p className="text-sm text-slate-500 mb-4">We&apos;ll show you exactly where your request is in the pipeline.</p>
+        <form onSubmit={submit} className="flex gap-2">
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="e.g. WF-00042"
+            className="flex-1 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-teal-400 transition"
+          />
+          <button
+            type="submit"
+            disabled={loading}
+            className="rounded-xl bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 disabled:opacity-60 text-white font-semibold px-5 text-sm transition shadow-card"
+          >
+            {loading ? "Checking…" : "Track order"}
+          </button>
+        </form>
+        {error && <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2 mt-4">{error}</p>}
+      </div>
 
       {result && meta && (
-        <div className="rounded-xl border border-slate-100 p-4 sm:p-5">
-          <div className="flex items-start gap-3 mb-5">
-            {result.logo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={result.logo_url} alt="" className="h-12 w-12 rounded-lg object-contain bg-slate-50 border border-slate-100 shrink-0" />
-            ) : null}
-            <div className="min-w-0">
-              <p className="text-[11px] font-mono font-semibold text-teal-600 tracking-wide">{formatOrderNumber(result.id)}</p>
-              <p className="text-base font-semibold text-slate-900 truncate">{result.order_name || "Untitled order"}</p>
-              <p className="text-sm text-slate-500">
-                {result.order_type}
-                {result.design_type ? ` · ${result.design_type}` : ""}
-              </p>
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-card p-6 sm:p-8">
+          <div className="flex items-start justify-between gap-3 mb-5">
+            <div className="flex items-center gap-3 min-w-0">
+              {result.logo_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={result.logo_url} alt="" className="h-12 w-12 rounded-lg object-contain bg-slate-50 border border-slate-100 shrink-0" />
+              ) : null}
+              <div className="min-w-0">
+                <button
+                  type="button"
+                  onClick={copyOrderNumber}
+                  title="Copy order number"
+                  className="flex items-center gap-1 text-[11px] font-mono font-semibold text-teal-600 tracking-wide hover:text-teal-700"
+                >
+                  {formatOrderNumber(result.id)}
+                  <svg viewBox="0 0 24 24" fill="none" className="h-3 w-3">
+                    <rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" strokeWidth="1.7" />
+                    <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" stroke="currentColor" strokeWidth="1.7" />
+                  </svg>
+                  {copied && <span className="text-emerald-600 font-sans font-medium normal-case">Copied</span>}
+                </button>
+                <p className="text-lg font-semibold text-slate-900 truncate">{result.order_name || "Untitled order"}</p>
+              </div>
             </div>
             <span
-              className={`ml-auto shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
+              className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
                 result.status === "delivered" ? "bg-emerald-50 text-emerald-700" : "bg-teal-50 text-teal-700"
               }`}
             >
@@ -273,13 +311,37 @@ function TrackOrder() {
             </span>
           </div>
 
-          {/* Named-stage tracker */}
-          <div className="flex items-center mb-6">
-            {TRACK_STAGES.map((label, i) => (
-              <Fragment key={label}>
-                <div className="flex flex-col items-center gap-1 shrink-0">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-6">
+            <InfoTile label="Order type" value={result.order_type || "—"} />
+            <InfoTile label="Priority" value={priorityMeta?.label || "—"} />
+            <InfoTile label="Requested" value={result.requested_date ? new Date(result.requested_date).toLocaleDateString() : "—"} />
+            <InfoTile label="Expected delivery" value={result.due_date ? new Date(result.due_date).toLocaleDateString() : "—"} />
+          </div>
+
+          <div className="border-t border-slate-100 pt-5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-slate-800">Order progress</h3>
+              <span className="text-xs font-medium text-teal-600">
+                {percent}% · Step {meta.step + 1} of {TRACK_STAGES.length}
+              </span>
+            </div>
+            <div className="h-1.5 rounded-full bg-slate-100 mb-6 overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${
+                  result.status === "delivered" ? "bg-emerald-500" : "bg-gradient-to-r from-teal-500 to-cyan-500"
+                }`}
+                style={{ width: `${percent}%` }}
+              />
+            </div>
+
+            <div>
+              {TRACK_STAGES.map((label, i) => (
+                <div key={label} className="relative flex gap-3 pb-6 last:pb-0">
+                  {i < TRACK_STAGES.length - 1 && (
+                    <span className={`absolute left-[11px] top-6 bottom-0 w-0.5 ${i < meta.step ? "bg-teal-400" : "bg-slate-200"}`} />
+                  )}
                   <span
-                    className={`flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-semibold ${
+                    className={`relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${
                       i < meta.step
                         ? "bg-teal-500 text-white"
                         : i === meta.step
@@ -290,32 +352,23 @@ function TrackOrder() {
                     }`}
                   >
                     {i < meta.step ? (
-                      <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5">
-                        <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                      <svg viewBox="0 0 24 24" fill="none" className="h-3 w-3">
+                        <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                     ) : (
                       i + 1
                     )}
                   </span>
-                  <span className={`hidden sm:block text-[10px] text-center max-w-[4.5rem] leading-tight ${i <= meta.step ? "text-slate-600 font-medium" : "text-slate-400"}`}>
-                    {label}
-                  </span>
+                  <div className="min-w-0 pt-0.5">
+                    <p className={`text-sm font-medium ${i <= meta.step ? "text-slate-800" : "text-slate-400"}`}>{label}</p>
+                    {i === meta.step && (
+                      <p className="text-xs text-slate-500 mt-1.5 bg-slate-50 rounded-lg px-2.5 py-1.5 inline-block">
+                        {STAGE_HELP[i]}
+                      </p>
+                    )}
+                  </div>
                 </div>
-                {i < TRACK_STAGES.length - 1 && (
-                  <span className={`flex-1 h-0.5 mx-1 rounded-full ${i < meta.step ? "bg-teal-500" : "bg-slate-200"}`} />
-                )}
-              </Fragment>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div className="rounded-lg bg-slate-50 px-3 py-2">
-              <p className="text-xs text-slate-400">Requested</p>
-              <p className="text-slate-700 font-medium">{result.requested_date ? new Date(result.requested_date).toLocaleDateString() : "—"}</p>
-            </div>
-            <div className="rounded-lg bg-slate-50 px-3 py-2">
-              <p className="text-xs text-slate-400">Expected delivery</p>
-              <p className="text-slate-700 font-medium">{result.due_date ? new Date(result.due_date).toLocaleDateString() : "—"}</p>
+              ))}
             </div>
           </div>
         </div>
@@ -523,7 +576,8 @@ export default function RequestPage() {
 
   if (done) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-teal-50 via-cyan-50/40 to-slate-50 flex items-center justify-center px-4 py-12">
+      <div className="min-h-[100dvh] flex items-center justify-center px-4 py-12">
+        <div className="fixed inset-0 -z-10 bg-gradient-to-b from-teal-50 via-cyan-50/40 to-slate-50" />
         <div className="w-full max-w-md bg-white rounded-2xl border border-slate-200/80 shadow-card p-8 text-center">
           <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-teal-50 text-teal-600 mb-4">
             <svg viewBox="0 0 24 24" fill="none" className="h-7 w-7">
@@ -566,9 +620,10 @@ export default function RequestPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-teal-50 via-cyan-50/40 to-slate-50 px-4 py-10 sm:py-14">
+    <div className="px-4 py-8 sm:py-10">
+      <div className="fixed inset-0 -z-10 bg-gradient-to-b from-teal-50 via-cyan-50/40 to-slate-50" />
       <div className="mx-auto w-full max-w-2xl">
-        <div className="flex items-center gap-3 mb-6">
+        <div className="flex items-center gap-3 mb-5">
           <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 via-teal-500 to-emerald-400 text-white font-bold shadow-card">
             W
           </span>
@@ -580,7 +635,7 @@ export default function RequestPage() {
           </div>
         </div>
 
-        <div className="flex gap-1.5 mb-6 bg-white rounded-xl border border-slate-200/80 p-1 shadow-card w-fit">
+        <div className="flex gap-1.5 mb-5 bg-white rounded-xl border border-slate-200/80 p-1 shadow-card w-fit">
           <button
             onClick={() => setTab("submit")}
             className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
@@ -942,7 +997,7 @@ export default function RequestPage() {
 
               {error && <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2 mt-5">{error}</p>}
 
-              <div className="flex items-center justify-between gap-3 mt-6 pt-5 border-t border-slate-100">
+              <div className="flex items-center justify-between gap-3 mt-5 pt-4 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={goBack}
