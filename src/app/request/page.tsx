@@ -216,6 +216,96 @@ function InfoTile({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+function Panel({
+  title,
+  tip,
+  className = "",
+  children,
+}: {
+  title: string;
+  tip?: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={`bg-white rounded-2xl border border-slate-200/80 shadow-card p-5 sm:p-6 ${className}`}>
+      <h3 className="text-sm font-semibold text-slate-800 mb-4">{title}</h3>
+      {children}
+      {tip && (
+        <div className="mt-4 flex items-start gap-2 rounded-xl bg-teal-50/70 border border-teal-100 px-3 py-2.5 text-xs text-teal-800">
+          <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 shrink-0 mt-0.5">
+            <path
+              d="M12 18.5v-5m0-3.5h.01M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"
+              stroke="currentColor"
+              strokeWidth="1.7"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <span>{tip}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DesignTypeIcon({ type }: { type: string }) {
+  if (type === "Jersey") {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6">
+        <path
+          d="M8.5 3.5 4 7v3.5h3V20h10v-9.5h3V7l-4.5-3.5-2 2h-3l-2-2Z"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
+  if (type === "Uniform") {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6">
+        <path d="M9 3h6l1.5 3.5-2 2V21h-5V8.5l-2-2L9 3Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+        <path d="M9 8 6 9.5M15 8l3 1.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6">
+      <path
+        d="M12 3v3M12 18v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M3 12h3M18 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+      <circle cx="12" cy="12" r="3.2" stroke="currentColor" strokeWidth="1.6" />
+    </svg>
+  );
+}
+
+function YesNoToggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div className="inline-flex rounded-lg border border-slate-200 overflow-hidden text-sm font-medium shrink-0">
+      <button
+        type="button"
+        onClick={() => onChange(true)}
+        className={`px-4 py-1.5 transition ${value ? "bg-teal-600 text-white" : "text-slate-500 hover:bg-slate-50"}`}
+      >
+        Yes
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange(false)}
+        className={`px-4 py-1.5 transition border-l border-slate-200 ${
+          !value ? "bg-teal-600 text-white" : "text-slate-500 hover:bg-slate-50"
+        }`}
+      >
+        No
+      </button>
+    </div>
+  );
+}
+
 function TrackOrder() {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
@@ -622,7 +712,7 @@ export default function RequestPage() {
   return (
     <div className="px-4 py-8 sm:py-10">
       <div className="fixed inset-0 -z-10 bg-gradient-to-b from-teal-50 via-cyan-50/40 to-slate-50" />
-      <div className="mx-auto w-full max-w-2xl">
+      <div className={`mx-auto w-full transition-all ${tab === "submit" && step < 3 ? "max-w-4xl" : "max-w-2xl"}`}>
         <div className="flex items-center gap-3 mb-5">
           <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 via-teal-500 to-emerald-400 text-white font-bold shadow-card">
             W
@@ -660,120 +750,152 @@ export default function RequestPage() {
           <>
             <Stepper current={step} />
 
-            <form onSubmit={submit} className={cardCls}>
+            <form onSubmit={submit} className="space-y-5">
               {/* Step 1: Order Details */}
               {step === 0 && (
                 <div>
                   <StepHeader title={WIZARD_STEPS[0].title} subtitle={WIZARD_STEPS[0].subtitle} />
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <div className="sm:col-span-2">
-                      <label className={labelCls}>
-                        Order name <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        value={orderName}
-                        onChange={(e) => setOrderName(e.target.value)}
-                        placeholder="e.g. Home Jersey — Blue Marlins FC"
-                        className={inputCls}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className={labelCls}>
-                        Order type <span className="text-red-500">*</span>
-                      </label>
-                      <select value={orderType} onChange={(e) => setOrderType(e.target.value)} className={inputCls}>
-                        {ORDER_TYPES.map((t) => (
-                          <option key={t} value={t}>
-                            {t}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className={labelCls}>Design type</label>
-                      <div className="grid grid-cols-3 gap-2">
-                        {DESIGN_TYPES.map((t) => (
-                          <button key={t} type="button" onClick={() => setDesignType(t)} className={chipCls(designType === t)}>
-                            {t}
-                          </button>
-                        ))}
-                      </div>
+                  <div className="grid lg:grid-cols-3 gap-5">
+                    <div className="lg:col-span-2">
+                      <Panel title="Order Information">
+                        <div className="grid sm:grid-cols-2 gap-4">
+                          <div className="sm:col-span-2">
+                            <label className={labelCls}>
+                              Order name <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              value={orderName}
+                              onChange={(e) => setOrderName(e.target.value)}
+                              placeholder="e.g. Home Jersey — Blue Marlins FC"
+                              className={inputCls}
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label className={labelCls}>
+                              Order type <span className="text-red-500">*</span>
+                            </label>
+                            <select value={orderType} onChange={(e) => setOrderType(e.target.value)} className={inputCls}>
+                              {ORDER_TYPES.map((t) => (
+                                <option key={t} value={t}>
+                                  {t}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className={labelCls}>
+                              Priority level
+                            </label>
+                            <div className="grid grid-cols-4 gap-1.5">
+                              {PRIORITY_OPTIONS.map((p) => (
+                                <button
+                                  key={p.value}
+                                  type="button"
+                                  onClick={() => setPriority(p.value)}
+                                  title={p.label}
+                                  className={`flex items-center justify-center gap-1 ${chipCls(priority === p.value)}`}
+                                >
+                                  <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${p.dot}`} />
+                                  <span className="truncate">{p.label}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <label className={labelCls}>
+                              Client / team name <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              value={clientName}
+                              onChange={(e) => setClientName(e.target.value)}
+                              placeholder="Who is this order for?"
+                              className={inputCls}
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label className={labelCls}>Contact / WhatsApp group link</label>
+                            <input
+                              value={contact}
+                              onChange={(e) => setContact(e.target.value)}
+                              placeholder="Phone number or WhatsApp group link"
+                              className={inputCls}
+                            />
+                          </div>
+                          <div>
+                            <label className={labelCls}>Requested date</label>
+                            <input
+                              type="date"
+                              value={requestedDate}
+                              onChange={(e) => setRequestedDate(e.target.value)}
+                              className={inputCls}
+                            />
+                          </div>
+                          <div>
+                            <label className={labelCls}>
+                              Expected delivery date <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="date"
+                              value={dueDate}
+                              onChange={(e) => setDueDate(e.target.value)}
+                              className={inputCls}
+                              required
+                            />
+                          </div>
+                        </div>
+                      </Panel>
                     </div>
 
-                    {designType === "Jersey" && (
-                      <div className="sm:col-span-2">
-                        <label className={labelCls}>
-                          Jersey for <span className="text-red-500">*</span>
-                          <span className="text-xs text-slate-400 font-normal"> — select at least one</span>
-                        </label>
-                        <div className="grid grid-cols-4 gap-2">
-                          {JERSEY_ROLES.map((r) => (
+                    <div>
+                      <Panel title="Design Type">
+                        <div className="grid grid-cols-3 gap-2">
+                          {DESIGN_TYPES.map((t) => (
                             <button
-                              key={r}
+                              key={t}
                               type="button"
-                              onClick={() => toggleSet(setJerseyRoles, r)}
-                              className={chipCls(jerseyRoles.has(r))}
+                              onClick={() => setDesignType(t)}
+                              className={`relative flex flex-col items-center gap-1.5 rounded-xl border px-2 py-3.5 text-center transition ${
+                                designType === t
+                                  ? "border-teal-500 bg-teal-50 text-teal-700"
+                                  : "border-slate-200 text-slate-500 hover:border-slate-300"
+                              }`}
                             >
-                              {r}
+                              {designType === t && (
+                                <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-teal-500 text-white">
+                                  <svg viewBox="0 0 24 24" fill="none" className="h-2.5 w-2.5">
+                                    <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                                  </svg>
+                                </span>
+                              )}
+                              <DesignTypeIcon type={t} />
+                              <span className="text-xs font-medium">{t}</span>
                             </button>
                           ))}
                         </div>
-                      </div>
-                    )}
 
-                    <div>
-                      <label className={labelCls}>
-                        Client / team name <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        value={clientName}
-                        onChange={(e) => setClientName(e.target.value)}
-                        placeholder="Who is this order for?"
-                        className={inputCls}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Contact / WhatsApp group link</label>
-                      <input
-                        value={contact}
-                        onChange={(e) => setContact(e.target.value)}
-                        placeholder="Phone number or WhatsApp group link"
-                        className={inputCls}
-                      />
-                    </div>
-
-                    <div>
-                      <label className={labelCls}>Requested date</label>
-                      <input
-                        type="date"
-                        value={requestedDate}
-                        onChange={(e) => setRequestedDate(e.target.value)}
-                        className={inputCls}
-                      />
-                    </div>
-                    <div>
-                      <label className={labelCls}>
-                        Expected delivery date <span className="text-red-500">*</span>
-                      </label>
-                      <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={inputCls} required />
-                    </div>
-                    <div className="sm:col-span-2">
-                      <label className={labelCls}>Priority level</label>
-                      <div className="grid grid-cols-4 gap-2">
-                        {PRIORITY_OPTIONS.map((p) => (
-                          <button
-                            key={p.value}
-                            type="button"
-                            onClick={() => setPriority(p.value)}
-                            className={`flex items-center justify-center gap-1.5 ${chipCls(priority === p.value)}`}
-                          >
-                            <span className={`h-1.5 w-1.5 rounded-full ${p.dot}`} />
-                            {p.label}
-                          </button>
-                        ))}
-                      </div>
+                        {designType === "Jersey" && (
+                          <div className="mt-4 pt-4 border-t border-slate-100">
+                            <label className={labelCls}>
+                              Jersey for <span className="text-red-500">*</span>
+                              <span className="text-xs text-slate-400 font-normal block">Select at least one</span>
+                            </label>
+                            <div className="grid grid-cols-2 gap-2">
+                              {JERSEY_ROLES.map((r) => (
+                                <button
+                                  key={r}
+                                  type="button"
+                                  onClick={() => toggleSet(setJerseyRoles, r)}
+                                  className={chipCls(jerseyRoles.has(r))}
+                                >
+                                  {r}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </Panel>
                     </div>
                   </div>
                 </div>
@@ -784,135 +906,153 @@ export default function RequestPage() {
                 <div>
                   <StepHeader title={WIZARD_STEPS[1].title} subtitle={WIZARD_STEPS[1].subtitle} />
 
-                  <div className="mb-5">
-                    <ImageDrop
-                      label="Logo"
-                      hint="Click to upload the main logo"
-                      file={logoFile}
-                      preview={logoPreview}
-                      onPick={pickLogo}
-                      onClear={() => pickLogo(null)}
-                    />
-                  </div>
-
-                  <label className={labelCls}>Sponsors (if any)</label>
-                  <div className="space-y-3 mb-1">
-                    {sponsors.map((s, idx) => (
-                      <div key={s.key} className="rounded-xl border border-slate-100 p-3">
-                        <div className="flex items-center gap-2 mb-2">
-                          <input
-                            value={s.name}
-                            onChange={(e) => updateSponsorName(s.key, e.target.value)}
-                            placeholder={`Sponsor ${idx + 1} name`}
-                            className={inputCls}
+                  <div className="grid lg:grid-cols-3 gap-5">
+                    <div className="lg:col-span-2 space-y-5">
+                      <Panel title="Branding & Artwork" tip="High quality logo files (PNG, SVG, or JPG) help us deliver the best results.">
+                        <div className="mb-5">
+                          <ImageDrop
+                            label="Main logo / design"
+                            hint="Click to upload the main logo"
+                            file={logoFile}
+                            preview={logoPreview}
+                            onPick={pickLogo}
+                            onClear={() => pickLogo(null)}
                           />
-                          {sponsors.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => removeSponsorRow(s.key)}
-                              className="text-slate-400 hover:text-red-500 text-sm px-2 shrink-0"
-                            >
-                              Remove
-                            </button>
-                          )}
                         </div>
-                        <ImageDrop
-                          label=""
-                          hint={`Upload sponsor ${idx + 1} logo`}
-                          file={s.file}
-                          preview={s.preview}
-                          onPick={(f) => updateSponsorFile(s.key, f)}
-                          onClear={() => updateSponsorFile(s.key, null)}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={addSponsorRow}
-                    className="mb-6 text-sm font-medium text-teal-600 hover:text-teal-700 flex items-center gap-1"
-                  >
-                    + Add another sponsor
-                  </button>
 
-                  <div className="grid sm:grid-cols-2 gap-4 mb-5 pt-5 border-t border-slate-100">
-                    <div>
-                      <label className={labelCls}>Neck type</label>
-                      <select value={neckType} onChange={(e) => setNeckType(e.target.value)} className={inputCls}>
-                        <option value="">Not specified</option>
-                        {NECK_TYPES.map((t) => (
-                          <option key={t} value={t}>
-                            {t}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className={labelCls}>
-                        Sleeve type <span className="text-xs text-slate-400 font-normal">— select any that apply</span>
-                      </label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {SLEEVE_TYPES.map((t) => (
-                          <button
-                            key={t}
-                            type="button"
-                            onClick={() => toggleSet(setSleeveTypes, t as string)}
-                            className={`${chipCls(sleeveTypes.has(t))} text-left`}
-                          >
-                            {t}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mb-5">
-                    <label className={labelCls}>Additional pieces needed</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {GARMENT_OPTIONS.map((g) => (
+                        <label className={labelCls}>Sponsors (if any)</label>
+                        <div className="space-y-3 mb-1">
+                          {sponsors.map((s, idx) => (
+                            <div key={s.key} className="rounded-xl border border-slate-100 p-3">
+                              <div className="flex items-center gap-2 mb-2">
+                                <input
+                                  value={s.name}
+                                  onChange={(e) => updateSponsorName(s.key, e.target.value)}
+                                  placeholder={`Sponsor ${idx + 1} name`}
+                                  className={inputCls}
+                                />
+                                {sponsors.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => removeSponsorRow(s.key)}
+                                    className="text-slate-400 hover:text-red-500 text-sm px-2 shrink-0"
+                                  >
+                                    Remove
+                                  </button>
+                                )}
+                              </div>
+                              <ImageDrop
+                                label=""
+                                hint={`Upload sponsor ${idx + 1} logo`}
+                                file={s.file}
+                                preview={s.preview}
+                                onPick={(f) => updateSponsorFile(s.key, f)}
+                                onClear={() => updateSponsorFile(s.key, null)}
+                              />
+                            </div>
+                          ))}
+                        </div>
                         <button
-                          key={g.key}
                           type="button"
-                          onClick={() => toggleSet(setGarments, g.key as string)}
-                          className={chipCls(garments.has(g.key))}
+                          onClick={addSponsorRow}
+                          className="text-sm font-medium text-teal-600 hover:text-teal-700 flex items-center gap-1"
                         >
-                          {g.label}
+                          + Add another sponsor
                         </button>
-                      ))}
-                    </div>
-                  </div>
+                      </Panel>
 
-                  <div className="pt-5 border-t border-slate-100">
-                    <label className={labelCls}>Does this order need player numbers?</label>
-                    <div className="grid grid-cols-2 gap-2 mb-4 max-w-xs">
-                      <button type="button" onClick={() => setNeedsNumbering(true)} className={chipCls(needsNumbering)}>
-                        Yes
-                      </button>
-                      <button type="button" onClick={() => setNeedsNumbering(false)} className={chipCls(!needsNumbering)}>
-                        No
-                      </button>
+                      <Panel title="Garment Options">
+                        <div className="grid sm:grid-cols-2 gap-4 mb-5">
+                          <div>
+                            <label className={labelCls}>Neck type</label>
+                            <select value={neckType} onChange={(e) => setNeckType(e.target.value)} className={inputCls}>
+                              <option value="">Not specified</option>
+                              {NECK_TYPES.map((t) => (
+                                <option key={t} value={t}>
+                                  {t}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className={labelCls}>
+                              Sleeve type <span className="text-xs text-slate-400 font-normal">— select any that apply</span>
+                            </label>
+                            <div className="grid grid-cols-2 gap-2">
+                              {SLEEVE_TYPES.map((t) => (
+                                <button
+                                  key={t}
+                                  type="button"
+                                  onClick={() => toggleSet(setSleeveTypes, t as string)}
+                                  className={`${chipCls(sleeveTypes.has(t))} text-left`}
+                                >
+                                  {t}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-3 pt-4 border-t border-slate-100">
+                          {GARMENT_OPTIONS.map((g) => (
+                            <div key={g.key} className="flex items-center justify-between gap-3">
+                              <span className="text-sm font-medium text-slate-700">{g.label} needed?</span>
+                              <YesNoToggle
+                                value={garments.has(g.key)}
+                                onChange={(v) =>
+                                  setGarments((prev) => {
+                                    const next = new Set(prev);
+                                    if (v) next.add(g.key);
+                                    else next.delete(g.key);
+                                    return next;
+                                  })
+                                }
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </Panel>
                     </div>
-                    {needsNumbering && (
-                      <div className="grid sm:grid-cols-3 gap-4">
-                        <div>
-                          <label className={labelCls}>Front number</label>
-                          <input value={numberFront} onChange={(e) => setNumberFront(e.target.value)} placeholder="e.g. 9" className={inputCls} />
+
+                    <div>
+                      <Panel title="Numbering" tip="Leave blank if numbers are not required.">
+                        <div className="flex items-center justify-between gap-3 mb-4">
+                          <span className="text-sm font-medium text-slate-700">Player numbers?</span>
+                          <YesNoToggle value={needsNumbering} onChange={setNeedsNumbering} />
                         </div>
-                        <div>
-                          <label className={labelCls}>Back number</label>
-                          <input value={numberBack} onChange={(e) => setNumberBack(e.target.value)} placeholder="e.g. 9" className={inputCls} />
-                        </div>
-                        <div>
-                          <label className={labelCls}>Shorts number (if any)</label>
-                          <input
-                            value={numberShorts}
-                            onChange={(e) => setNumberShorts(e.target.value)}
-                            placeholder="e.g. 9"
-                            className={inputCls}
-                          />
-                        </div>
-                      </div>
-                    )}
+                        {needsNumbering && (
+                          <div className="space-y-3">
+                            <div>
+                              <label className={labelCls}>Front number</label>
+                              <input
+                                value={numberFront}
+                                onChange={(e) => setNumberFront(e.target.value)}
+                                placeholder="e.g. 9"
+                                className={inputCls}
+                              />
+                            </div>
+                            <div>
+                              <label className={labelCls}>Back number</label>
+                              <input
+                                value={numberBack}
+                                onChange={(e) => setNumberBack(e.target.value)}
+                                placeholder="e.g. 9"
+                                className={inputCls}
+                              />
+                            </div>
+                            <div>
+                              <label className={labelCls}>Shorts number (if any)</label>
+                              <input
+                                value={numberShorts}
+                                onChange={(e) => setNumberShorts(e.target.value)}
+                                placeholder="e.g. 9"
+                                className={inputCls}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </Panel>
+                    </div>
                   </div>
                 </div>
               )}
@@ -921,28 +1061,30 @@ export default function RequestPage() {
               {step === 2 && (
                 <div>
                   <StepHeader title={WIZARD_STEPS[2].title} subtitle={WIZARD_STEPS[2].subtitle} />
-                  <div className="space-y-4">
-                    <div>
-                      <label className={labelCls}>Ideal design / reference</label>
-                      <textarea
-                        value={referenceNotes}
-                        onChange={(e) => setReferenceNotes(e.target.value)}
-                        placeholder="Describe or link a design you'd like this to look like — style, layout, past order, etc."
-                        rows={4}
-                        className={`${inputCls} resize-none`}
-                      />
+                  <Panel title="Additional Information">
+                    <div className="space-y-4">
+                      <div>
+                        <label className={labelCls}>Ideal design / reference</label>
+                        <textarea
+                          value={referenceNotes}
+                          onChange={(e) => setReferenceNotes(e.target.value)}
+                          placeholder="Describe or link a design you'd like this to look like — style, layout, past order, etc."
+                          rows={4}
+                          className={`${inputCls} resize-none`}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Other relevant information</label>
+                        <textarea
+                          value={description}
+                          onChange={(e) => setDescription(e.target.value)}
+                          placeholder="Sizes, colors, quantities, placement notes, deadlines to know about…"
+                          rows={4}
+                          className={`${inputCls} resize-none`}
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className={labelCls}>Other relevant information</label>
-                      <textarea
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        placeholder="Sizes, colors, quantities, placement notes, deadlines to know about…"
-                        rows={4}
-                        className={`${inputCls} resize-none`}
-                      />
-                    </div>
-                  </div>
+                  </Panel>
                 </div>
               )}
 
@@ -950,7 +1092,7 @@ export default function RequestPage() {
               {step === 3 && (
                 <div>
                   <StepHeader title={WIZARD_STEPS[3].title} subtitle={WIZARD_STEPS[3].subtitle} />
-                  <div className="space-y-3">
+                  <div className="bg-white rounded-2xl border border-slate-200/80 shadow-card p-5 sm:p-6 space-y-3">
                     <ReviewSection title="Order details" onEdit={() => setStep(0)}>
                       <ReviewItem label="Order name" value={orderName} />
                       <ReviewItem label="Order type" value={orderType} />
@@ -995,9 +1137,9 @@ export default function RequestPage() {
                 </div>
               )}
 
-              {error && <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2 mt-5">{error}</p>}
+              {error && <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">{error}</p>}
 
-              <div className="flex items-center justify-between gap-3 mt-5 pt-4 border-t border-slate-100">
+              <div className="flex items-center justify-between gap-3">
                 <button
                   type="button"
                   onClick={goBack}
