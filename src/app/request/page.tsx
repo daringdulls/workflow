@@ -346,30 +346,55 @@ function TrackOrder() {
 
   return (
     <div className="space-y-5">
-      <div className="bg-white/95 rounded-2xl border border-violet-100 shadow-card p-6 sm:p-8">
-        <h2 className="text-base font-semibold text-slate-900 mb-1">Enter your order number to check its status</h2>
-        <p className="text-sm text-slate-500 mb-4">We&apos;ll show you exactly where your request is in the pipeline.</p>
-        <form onSubmit={submit} className="flex gap-2 max-w-xl">
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="e.g. WF-00042"
-            className="flex-1 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-teal-400 transition"
-          />
+      <div className="relative overflow-hidden bg-[linear-gradient(115deg,#ffffff_0%,#fbf9ff_62%,#f1ecff_100%)] rounded-2xl border border-violet-200/70 shadow-card p-6 sm:p-8">
+        <div className="absolute -right-10 -bottom-20 h-52 w-52 rounded-full bg-violet-200/25 blur-2xl" />
+        <div className="relative grid lg:grid-cols-[260px_1fr] gap-6 lg:items-center">
+          <div>
+            <h2 className="text-base font-semibold text-slate-900 mb-1">Enter your order number to check its real-time status</h2>
+            <p className="text-sm text-slate-500">We&apos;ll show you every step of the way.</p>
+          </div>
+          <form onSubmit={submit} className="flex flex-col sm:flex-row gap-2">
+            <label className="flex-1">
+              <span className="sr-only">Order number</span>
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Enter order number (e.g. WF-00042)"
+                className="w-full rounded-xl border border-violet-100 bg-white px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-teal-400 transition shadow-sm"
+              />
+              <span className="block text-[11px] text-slate-400 mt-2">You can find your order number in the confirmation message.</span>
+            </label>
           <button
             type="submit"
             disabled={loading}
-            className="rounded-xl bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 disabled:opacity-60 text-white font-semibold px-5 text-sm transition shadow-card"
+            className="h-12 rounded-xl bg-gradient-to-r from-teal-600 to-cyan-600 disabled:opacity-60 text-white font-semibold px-6 text-sm transition shadow-card hover:-translate-y-0.5"
           >
-            {loading ? "Checking…" : "Track order"}
+            {loading ? "Checking…" : "⌕  Track order"}
           </button>
-        </form>
+          </form>
+        </div>
         {error && <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2 mt-4 max-w-xl">{error}</p>}
       </div>
 
+      {!result && (
+        <div className="grid sm:grid-cols-3 gap-4">
+          {[
+            ["01", "Secure lookup", "Only someone with the order number can view its details."],
+            ["02", "Live progress", "See when your request moves from submitted to delivered."],
+            ["03", "Clear timelines", "Requested and expected delivery dates stay together."],
+          ].map(([number, title, copy]) => (
+            <div key={number} className="bg-white/85 rounded-2xl border border-violet-100 shadow-card p-5">
+              <span className="text-xs font-semibold text-design bg-design-50 rounded-full px-2.5 py-1">{number}</span>
+              <h3 className="font-semibold text-slate-900 mt-4">{title}</h3>
+              <p className="text-sm text-slate-500 mt-1 leading-6">{copy}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
       {result && meta && (
-        <div className="grid lg:grid-cols-3 gap-5">
-          <div className="lg:col-span-2">
+        <div className="grid lg:grid-cols-[minmax(0,1fr)_360px] gap-5 items-start">
+          <div>
             <Panel title="Order Details">
               <div className="flex items-start justify-between gap-3 mb-5">
                 <div className="flex items-center gap-3 min-w-0">
@@ -412,7 +437,7 @@ function TrackOrder() {
             </Panel>
           </div>
 
-          <div>
+          <div className="lg:sticky lg:top-6">
             <Panel title="Order Progress">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs font-medium text-teal-600">
@@ -718,39 +743,51 @@ export default function RequestPage() {
   }
 
   return (
-    <div className="request-theme px-4 py-7 sm:px-6 sm:py-10 min-h-[100dvh]">
+    <div className="request-theme min-h-[100dvh] lg:flex">
       <div className="fixed inset-0 -z-10 bg-[radial-gradient(circle_at_78%_0%,rgba(221,212,255,0.72),transparent_30%),radial-gradient(circle_at_8%_35%,rgba(235,244,255,0.8),transparent_26%),linear-gradient(180deg,#fdfcff_0%,#f7f8fc_100%)]" />
-      <div className="mx-auto w-full max-w-[1320px]">
-        <div className="flex items-center gap-3 mb-6 rounded-2xl border border-white/80 bg-white/65 backdrop-blur-xl px-4 py-3 shadow-card">
-          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 via-violet-600 to-cyan-400 text-white font-bold shadow-card">
+      <aside className="bg-[linear-gradient(180deg,#090b20_0%,#0d1029_55%,#080a1b_100%)] lg:w-60 lg:min-h-screen lg:sticky lg:top-0 text-white p-4 lg:p-5 flex lg:flex-col gap-4 lg:gap-7 border-r border-white/5">
+        <div className="flex items-center gap-3 px-1 lg:px-0 shrink-0">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 via-violet-600 to-cyan-400 text-white font-bold shadow-card">
             W
           </span>
           <div>
-            <p className="text-lg font-semibold text-slate-900 leading-tight">
-              {tab === "submit" ? "New Design Request" : "Track Your Request"}
-            </p>
-            <p className="text-sm text-slate-500 leading-tight">Pixelate MV · Sublimation Printing</p>
+            <p className="font-semibold leading-tight">WorkFlow</p>
+            <p className="text-[11px] text-slate-400 leading-tight">Pixelate MV</p>
           </div>
         </div>
-
-        <div className="flex gap-1.5 mb-6 bg-white/85 rounded-xl border border-violet-100 p-1.5 shadow-card w-fit">
+        <nav className="flex lg:flex-col gap-2 flex-1 overflow-x-auto">
           <button
             onClick={() => setTab("submit")}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-              tab === "submit" ? "bg-gradient-to-r from-teal-600 to-cyan-600 text-white" : "text-slate-500 hover:text-slate-700"
+            className={`whitespace-nowrap text-left rounded-xl px-4 py-3 text-sm font-medium transition ${
+              tab === "submit" ? "bg-gradient-to-r from-violet-600/90 to-indigo-600/80 text-white shadow-lg" : "text-slate-300 hover:bg-white/5"
             }`}
           >
-            Submit request
+            ✎ &nbsp; Submit request
           </button>
           <button
             onClick={() => setTab("track")}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-              tab === "track" ? "bg-gradient-to-r from-teal-600 to-cyan-600 text-white" : "text-slate-500 hover:text-slate-700"
+            className={`whitespace-nowrap text-left rounded-xl px-4 py-3 text-sm font-medium transition ${
+              tab === "track" ? "bg-gradient-to-r from-violet-600/90 to-indigo-600/80 text-white shadow-lg" : "text-slate-300 hover:bg-white/5"
             }`}
           >
-            Track order
+            ◯ &nbsp; Track order
           </button>
+        </nav>
+        <div className="hidden lg:block rounded-2xl border border-white/10 bg-white/[0.03] p-4 mt-auto">
+          <p className="text-sm font-semibold">Need help?</p>
+          <p className="text-xs text-slate-400 mt-1 leading-5">Contact our design team for help with your request.</p>
         </div>
+      </aside>
+
+      <main className="flex-1 min-w-0 px-4 py-6 sm:px-8 lg:px-10 lg:py-8">
+        <div className="mx-auto w-full max-w-[1280px]">
+          <header className="mb-7 flex items-center justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight text-slate-950">{tab === "submit" ? "Submit Design Request" : "Track Your Request"}</h1>
+              <p className="text-sm text-slate-500 mt-1">{tab === "submit" ? "Create a new design request for your team" : "Stay updated on the progress of your design order"}</p>
+            </div>
+            <span className="hidden sm:flex h-10 w-10 items-center justify-center rounded-full border border-violet-100 bg-white text-design shadow-card">✦</span>
+          </header>
 
         {tab === "track" ? (
           <TrackOrder />
@@ -1180,7 +1217,8 @@ export default function RequestPage() {
             </p>
           </>
         )}
-      </div>
+        </div>
+      </main>
     </div>
   );
 }
