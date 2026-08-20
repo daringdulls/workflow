@@ -390,7 +390,7 @@ export default function Dashboard() {
   const anyMenuOpen = notifOpen || profileMenuOpen;
 
   return (
-    <div className="min-h-screen bg-[#f6f7f9] dark:bg-slate-950 lg:flex transition-colors">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_82%_0%,rgba(238,233,255,0.75),transparent_28%),#f8f8fc] dark:bg-slate-950 lg:flex transition-colors">
       {anyMenuOpen && (
         <div
           className="fixed inset-0 z-40"
@@ -402,7 +402,7 @@ export default function Dashboard() {
       )}
 
       {/* Sidebar */}
-      <aside className="lg:w-64 lg:flex-shrink-0 bg-slate-950 lg:min-h-screen lg:sticky lg:top-0 lg:self-start">
+      <aside className="lg:w-64 lg:flex-shrink-0 bg-[linear-gradient(180deg,#090b20_0%,#0d1029_55%,#080a1b_100%)] lg:min-h-screen lg:sticky lg:top-0 lg:self-start border-r border-white/5">
         <div className="flex flex-col h-full lg:h-screen px-4 py-5">
           <div className="flex items-center gap-2.5 px-2 mb-6">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-hotel via-design to-freelance text-white font-bold text-sm shadow-card">
@@ -455,7 +455,7 @@ export default function Dashboard() {
 
       {/* Main content */}
       <div className="flex-1 min-w-0">
-        <header className="border-b border-slate-200/70 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur sticky top-0 z-20">
+        <header className="border-b border-violet-100/70 dark:border-slate-800 bg-white/75 dark:bg-slate-900/80 backdrop-blur-xl sticky top-0 z-20">
           <div className="px-4 sm:px-8 py-5 flex flex-wrap items-center justify-between gap-4">
             <div className="min-w-0">
               <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100 truncate">
@@ -547,7 +547,7 @@ export default function Dashboard() {
               <ThemeToggle />
 
               <span
-                className={`hidden sm:inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${heroMeta.chipBg} ${heroMeta.chipText} ${heroMeta.chipDarkBg} ${heroMeta.chipDarkText}`}
+                className={`hidden sm:inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium border border-white/70 shadow-sm ${heroMeta.chipBg} ${heroMeta.chipText} ${heroMeta.chipDarkBg} ${heroMeta.chipDarkText}`}
               >
                 <span className={`h-1.5 w-1.5 rounded-full ${heroMeta.accentBg}`} />
                 Live workspace
@@ -556,7 +556,7 @@ export default function Dashboard() {
           </div>
         </header>
 
-        <main className="px-4 sm:px-8 py-6 space-y-6 max-w-6xl">
+        <main className="px-4 sm:px-8 py-7 space-y-6 max-w-[1500px] mx-auto">
           <SummaryStrip scope={scope} tasks={tasks} orders={orders} projects={projects} onViewAll={viewAll} />
 
           {scope === "all" && (
@@ -659,7 +659,7 @@ function SummaryStrip({
       {tiles.map((tile) => (
         <div
           key={tile.label}
-          className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-card px-4 py-4 flex flex-col gap-3"
+          className="bg-white/90 dark:bg-slate-900 rounded-2xl border border-violet-100/80 dark:border-slate-800 shadow-card px-5 py-5 flex flex-col gap-4 hover:-translate-y-0.5 hover:shadow-card-hover transition-all"
         >
           <div className="flex items-center gap-3">
             <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${TILE_ACCENT[tile.label]}`}>

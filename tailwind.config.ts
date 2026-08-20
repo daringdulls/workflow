@@ -10,7 +10,7 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["system-ui", "-apple-system", "Segoe UI", "Roboto", "Helvetica Neue", "sans-serif"],
+        sans: ["Inter", "Aptos", "system-ui", "-apple-system", "Segoe UI", "sans-serif"],
       },
       colors: {
         hotel: {
@@ -23,13 +23,14 @@ const config: Config = {
           900: "#0d366b",
         },
         design: {
-          50: "#f1eefb",
-          100: "#e4defa",
-          400: "#7a6bc9",
-          DEFAULT: "#4a3aa7",
-          600: "#3d2f8c",
-          700: "#2f2470",
-          900: "#1c1546",
+          50: "#f7f5ff",
+          100: "#eee9ff",
+          200: "#ddd4ff",
+          400: "#8b73e6",
+          DEFAULT: "#6847d8",
+          600: "#5b3bc4",
+          700: "#482e9f",
+          900: "#281b58",
         },
         freelance: {
           50: "#e8f9f2",
@@ -48,8 +49,8 @@ const config: Config = {
         },
       },
       boxShadow: {
-        card: "0 1px 2px 0 rgba(15, 23, 42, 0.04), 0 1px 3px 0 rgba(15, 23, 42, 0.06)",
-        "card-hover": "0 4px 10px -2px rgba(15, 23, 42, 0.10), 0 2px 4px -2px rgba(15, 23, 42, 0.06)",
+        card: "0 1px 2px rgba(42, 32, 79, 0.03), 0 8px 28px rgba(42, 32, 79, 0.045)",
+        "card-hover": "0 16px 38px -12px rgba(72, 46, 159, 0.18), 0 4px 12px rgba(42, 32, 79, 0.06)",
       },
     },
   },

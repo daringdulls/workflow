@@ -156,7 +156,7 @@ export default function DesignBoard({
   }
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-card p-5">
+    <div className="bg-white/90 dark:bg-slate-900 rounded-2xl border border-violet-100/80 dark:border-slate-800 shadow-card p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
         <div className="flex items-center gap-2">
           <span className="h-2 w-2 rounded-full bg-design" />
@@ -263,7 +263,7 @@ export default function DesignBoard({
         {COLUMNS.map((col) => {
           const colOrders = orders.filter((o) => o.status === col.key);
           return (
-            <div key={col.key} className="bg-slate-50 dark:bg-slate-800/40 rounded-xl p-3">
+            <div key={col.key} className="bg-[#faf9fd] dark:bg-slate-800/40 rounded-2xl p-3.5 border border-violet-100/60 dark:border-slate-800">
               <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2 flex items-center justify-between">
                 <span className="flex items-center gap-1.5">
                   <span className={`h-1.5 w-1.5 rounded-full ${col.dot}`} />
@@ -284,7 +284,7 @@ export default function DesignBoard({
                       onKeyDown={(e) => {
                         if (e.key === "Enter") setSelected(o);
                       }}
-                      className="cursor-pointer bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-3 shadow-card hover:shadow-card-hover hover:border-design-200 dark:hover:border-design/40 transition"
+                      className="cursor-pointer bg-white dark:bg-slate-900 rounded-xl border border-violet-100 dark:border-slate-700 p-3.5 shadow-card hover:-translate-y-0.5 hover:shadow-card-hover hover:border-design-200 dark:hover:border-design/40 transition-all"
                     >
                       <div className="flex items-start gap-2 mb-1.5">
                         {o.logo_url ? (

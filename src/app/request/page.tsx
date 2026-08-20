@@ -188,7 +188,7 @@ function ReviewSection({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-card p-5 sm:p-6 h-full">
+    <div className="bg-white/95 rounded-2xl border border-violet-100 shadow-card p-5 sm:p-6 h-full">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
         <button type="button" onClick={onEdit} className="text-xs font-medium text-teal-600 hover:text-teal-700">
@@ -228,7 +228,7 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <div className={`bg-white rounded-2xl border border-slate-200/80 shadow-card p-5 sm:p-6 ${className}`}>
+    <div className={`bg-white/95 rounded-2xl border border-violet-100 shadow-card p-5 sm:p-6 ${className}`}>
       <h3 className="text-sm font-semibold text-slate-800 mb-4">{title}</h3>
       {children}
       {tip && (
@@ -346,7 +346,7 @@ function TrackOrder() {
 
   return (
     <div className="space-y-5">
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-card p-6 sm:p-8">
+      <div className="bg-white/95 rounded-2xl border border-violet-100 shadow-card p-6 sm:p-8">
         <h2 className="text-base font-semibold text-slate-900 mb-1">Enter your order number to check its status</h2>
         <p className="text-sm text-slate-500 mb-4">We&apos;ll show you exactly where your request is in the pipeline.</p>
         <form onSubmit={submit} className="flex gap-2 max-w-xl">
@@ -674,8 +674,8 @@ export default function RequestPage() {
 
   if (done) {
     return (
-      <div className="min-h-[100dvh] flex items-center justify-center px-4 py-12">
-        <div className="fixed inset-0 -z-10 bg-gradient-to-b from-teal-50 via-cyan-50/40 to-slate-50" />
+      <div className="request-theme min-h-[100dvh] flex items-center justify-center px-4 py-12">
+        <div className="fixed inset-0 -z-10 bg-[radial-gradient(circle_at_75%_0%,rgba(221,212,255,0.8),transparent_32%),linear-gradient(180deg,#fbfaff_0%,#f7f8fc_100%)]" />
         <div className="w-full max-w-md bg-white rounded-2xl border border-slate-200/80 shadow-card p-8 text-center">
           <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-teal-50 text-teal-600 mb-4">
             <svg viewBox="0 0 24 24" fill="none" className="h-7 w-7">
@@ -718,11 +718,11 @@ export default function RequestPage() {
   }
 
   return (
-    <div className="px-4 py-8 sm:py-10">
-      <div className="fixed inset-0 -z-10 bg-gradient-to-b from-teal-50 via-cyan-50/40 to-slate-50" />
-      <div className="mx-auto w-full max-w-6xl">
-        <div className="flex items-center gap-3 mb-5">
-          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 via-teal-500 to-emerald-400 text-white font-bold shadow-card">
+    <div className="request-theme px-4 py-7 sm:px-6 sm:py-10 min-h-[100dvh]">
+      <div className="fixed inset-0 -z-10 bg-[radial-gradient(circle_at_78%_0%,rgba(221,212,255,0.72),transparent_30%),radial-gradient(circle_at_8%_35%,rgba(235,244,255,0.8),transparent_26%),linear-gradient(180deg,#fdfcff_0%,#f7f8fc_100%)]" />
+      <div className="mx-auto w-full max-w-[1320px]">
+        <div className="flex items-center gap-3 mb-6 rounded-2xl border border-white/80 bg-white/65 backdrop-blur-xl px-4 py-3 shadow-card">
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 via-violet-600 to-cyan-400 text-white font-bold shadow-card">
             W
           </span>
           <div>
@@ -733,7 +733,7 @@ export default function RequestPage() {
           </div>
         </div>
 
-        <div className="flex gap-1.5 mb-5 bg-white rounded-xl border border-slate-200/80 p-1 shadow-card w-fit">
+        <div className="flex gap-1.5 mb-6 bg-white/85 rounded-xl border border-violet-100 p-1.5 shadow-card w-fit">
           <button
             onClick={() => setTab("submit")}
             className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
