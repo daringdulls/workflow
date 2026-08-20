@@ -745,7 +745,7 @@ export default function RequestPage() {
   return (
     <div className="request-theme min-h-[100dvh] lg:flex">
       <div className="fixed inset-0 -z-10 bg-[radial-gradient(circle_at_78%_0%,rgba(221,212,255,0.72),transparent_30%),radial-gradient(circle_at_8%_35%,rgba(235,244,255,0.8),transparent_26%),linear-gradient(180deg,#fdfcff_0%,#f7f8fc_100%)]" />
-      <aside className="bg-[linear-gradient(180deg,#090b20_0%,#0d1029_55%,#080a1b_100%)] lg:w-60 lg:min-h-screen lg:sticky lg:top-0 text-white p-4 lg:p-5 flex lg:flex-col gap-4 lg:gap-7 border-r border-white/5">
+      <aside className="bg-white/82 backdrop-blur-2xl lg:w-60 lg:min-h-screen lg:sticky lg:top-0 text-slate-900 p-4 lg:p-5 flex lg:flex-col gap-4 lg:gap-7 border-r border-slate-200/70 shadow-[8px_0_30px_rgba(76,86,120,0.035)]">
         <div className="flex items-center gap-3 px-1 lg:px-0 shrink-0">
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 via-violet-600 to-cyan-400 text-white font-bold shadow-card">
             W
@@ -759,7 +759,7 @@ export default function RequestPage() {
           <button
             onClick={() => setTab("submit")}
             className={`whitespace-nowrap text-left rounded-xl px-4 py-3 text-sm font-medium transition ${
-              tab === "submit" ? "bg-gradient-to-r from-violet-600/90 to-indigo-600/80 text-white shadow-lg" : "text-slate-300 hover:bg-white/5"
+              tab === "submit" ? "bg-design-50 text-design-700 ring-1 ring-design-100 shadow-sm" : "text-slate-500 hover:bg-slate-100/80 hover:text-slate-800"
             }`}
           >
             ✎ &nbsp; Submit request
@@ -767,15 +767,15 @@ export default function RequestPage() {
           <button
             onClick={() => setTab("track")}
             className={`whitespace-nowrap text-left rounded-xl px-4 py-3 text-sm font-medium transition ${
-              tab === "track" ? "bg-gradient-to-r from-violet-600/90 to-indigo-600/80 text-white shadow-lg" : "text-slate-300 hover:bg-white/5"
+              tab === "track" ? "bg-design-50 text-design-700 ring-1 ring-design-100 shadow-sm" : "text-slate-500 hover:bg-slate-100/80 hover:text-slate-800"
             }`}
           >
             ◯ &nbsp; Track order
           </button>
         </nav>
-        <div className="hidden lg:block rounded-2xl border border-white/10 bg-white/[0.03] p-4 mt-auto">
+        <div className="hidden lg:block rounded-2xl border border-slate-200 bg-[linear-gradient(145deg,#ffffff,#f6f8ff)] p-4 mt-auto shadow-card">
           <p className="text-sm font-semibold">Need help?</p>
-          <p className="text-xs text-slate-400 mt-1 leading-5">Contact our design team for help with your request.</p>
+          <p className="text-xs text-slate-500 mt-1 leading-5">Contact our design team for help with your request.</p>
         </div>
       </aside>
 

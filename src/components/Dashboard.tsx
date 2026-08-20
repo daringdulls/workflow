@@ -390,7 +390,7 @@ export default function Dashboard() {
   const anyMenuOpen = notifOpen || profileMenuOpen;
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_82%_0%,rgba(238,233,255,0.75),transparent_28%),#f8f8fc] dark:bg-slate-950 lg:flex transition-colors">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_90%_0%,rgba(227,236,255,0.7),transparent_28%),radial-gradient(circle_at_30%_70%,rgba(244,240,255,0.65),transparent_32%),#f8fafc] dark:bg-slate-950 lg:flex transition-colors">
       {anyMenuOpen && (
         <div
           className="fixed inset-0 z-40"
@@ -402,34 +402,34 @@ export default function Dashboard() {
       )}
 
       {/* Sidebar */}
-      <aside className="lg:w-64 lg:flex-shrink-0 bg-[linear-gradient(180deg,#090b20_0%,#0d1029_55%,#080a1b_100%)] lg:min-h-screen lg:sticky lg:top-0 lg:self-start border-r border-white/5">
+      <aside className="lg:w-64 lg:flex-shrink-0 bg-white/82 dark:bg-slate-900/95 backdrop-blur-2xl lg:min-h-screen lg:sticky lg:top-0 lg:self-start border-r border-slate-200/70 dark:border-slate-800 shadow-[8px_0_30px_rgba(76,86,120,0.035)]">
         <div className="flex flex-col h-full lg:h-screen px-4 py-5">
           <div className="flex items-center gap-2.5 px-2 mb-6">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-hotel via-design to-freelance text-white font-bold text-sm shadow-card">
               W
             </span>
             <div>
-              <p className="text-white font-semibold leading-tight">WorkFlow</p>
-              <p className="text-[11px] text-slate-500 leading-tight">Pixelate MV</p>
+              <p className="text-slate-900 dark:text-white font-semibold leading-tight">WorkFlow</p>
+              <p className="text-[11px] text-slate-400 leading-tight">Pixelate MV</p>
             </div>
           </div>
 
           <ProfileTabs active={scope} onChange={setScope} />
 
-          <div className="mt-auto pt-4 border-t border-white/5 relative">
+          <div className="mt-auto pt-4 border-t border-slate-200/70 dark:border-white/5 relative">
             <button
               onClick={() => {
                 setProfileMenuOpen((v) => !v);
                 setNotifOpen(false);
               }}
-              className="w-full flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-white/5 transition relative z-50"
+              className="w-full flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition relative z-50"
             >
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-hotel via-design to-freelance text-white text-xs font-semibold">
                 DA
               </span>
               <span className="flex-1 min-w-0 text-left">
-                <p className="text-sm text-slate-200 font-medium truncate">daringdulls</p>
-                <p className="text-[11px] text-slate-500">Admin</p>
+                <p className="text-sm text-slate-800 dark:text-slate-200 font-medium truncate">daringdulls</p>
+                <p className="text-[11px] text-slate-400">Admin</p>
               </span>
               <svg
                 viewBox="0 0 24 24"

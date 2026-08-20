@@ -7,8 +7,8 @@ html, body {
 }
 
 body {
-  background-color: #f8f8fc;
-  color: #17152b;
+  background-color: #f8fafc;
+  color: #172033;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   text-rendering: optimizeLegibility;
 }
@@ -18,7 +18,7 @@ body {
 }
 
 ::selection {
-  background-color: #ddd4ff;
+  background-color: #dbe4ff;
 }
 
 .dark ::selection {
@@ -39,7 +39,7 @@ button, input, select, textarea {
 }
 
 button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visible {
-  outline: 3px solid rgba(139, 115, 230, 0.28);
+  outline: 3px solid rgba(100, 118, 204, 0.24);
   outline-offset: 2px;
 }
 
@@ -54,25 +54,25 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
 /* Public request workspace: a calm violet system that keeps the existing
    utility-driven form components consistent without duplicating markup. */
-.request-theme .bg-teal-600 { background-color: #6847d8 !important; }
-.request-theme .bg-teal-500 { background-color: #7b5ddd !important; }
-.request-theme .bg-teal-400 { background-color: #9c87ea !important; }
-.request-theme .bg-teal-50 { background-color: #f7f5ff !important; }
-.request-theme .bg-teal-50\/70 { background-color: rgba(247, 245, 255, 0.84) !important; }
-.request-theme .text-teal-800 { color: #3b287f !important; }
-.request-theme .text-teal-700 { color: #482e9f !important; }
-.request-theme .text-teal-600 { color: #6847d8 !important; }
-.request-theme .border-teal-500 { border-color: #6847d8 !important; }
-.request-theme .border-teal-300 { border-color: #bcaef2 !important; }
-.request-theme .border-teal-100 { border-color: #eee9ff !important; }
-.request-theme .ring-teal-100 { --tw-ring-color: #eee9ff !important; }
-.request-theme .focus\:ring-teal-400:focus { --tw-ring-color: #9c87ea !important; }
-.request-theme .focus\:border-teal-400:focus { border-color: #9c87ea !important; }
+.request-theme .bg-teal-600 { background-color: #6476cc !important; }
+.request-theme .bg-teal-500 { background-color: #7587d7 !important; }
+.request-theme .bg-teal-400 { background-color: #96a4e4 !important; }
+.request-theme .bg-teal-50 { background-color: #f4f6ff !important; }
+.request-theme .bg-teal-50\/70 { background-color: rgba(244, 246, 255, 0.86) !important; }
+.request-theme .text-teal-800 { color: #364273 !important; }
+.request-theme .text-teal-700 { color: #465494 !important; }
+.request-theme .text-teal-600 { color: #6476cc !important; }
+.request-theme .border-teal-500 { border-color: #6476cc !important; }
+.request-theme .border-teal-300 { border-color: #b9c3f0 !important; }
+.request-theme .border-teal-100 { border-color: #e8ecff !important; }
+.request-theme .ring-teal-100 { --tw-ring-color: #e8ecff !important; }
+.request-theme .focus\:ring-teal-400:focus { --tw-ring-color: #96a4e4 !important; }
+.request-theme .focus\:border-teal-400:focus { border-color: #96a4e4 !important; }
 .request-theme .from-teal-600 {
-  --tw-gradient-from: #6847d8 var(--tw-gradient-from-position) !important;
-  --tw-gradient-to: rgb(104 71 216 / 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-from: #6476cc var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: rgb(100 118 204 / 0) var(--tw-gradient-to-position) !important;
 }
-.request-theme .to-cyan-600 { --tw-gradient-to: #5269d8 var(--tw-gradient-to-position) !important; }
+.request-theme .to-cyan-600 { --tw-gradient-to: #6f9fc8 var(--tw-gradient-to-position) !important; }
 .request-theme input,
 .request-theme select,
 .request-theme textarea {

@@ -19,8 +19,8 @@ export const PROFILE_META: Record<
     label: "All Work",
     accent: "text-slate-300",
     accentBg: "bg-slate-700",
-    tintBg: "bg-white/10",
-    tintText: "text-white",
+    tintBg: "bg-slate-100",
+    tintText: "text-slate-800",
     ring: "ring-white/20",
     chipBg: "bg-slate-100",
     chipText: "text-slate-700",
@@ -31,8 +31,8 @@ export const PROFILE_META: Record<
     label: "Hotel Ops",
     accent: "text-hotel-400",
     accentBg: "bg-hotel",
-    tintBg: "bg-hotel/15",
-    tintText: "text-hotel-400",
+    tintBg: "bg-hotel-50",
+    tintText: "text-hotel-700",
     ring: "ring-hotel/30",
     chipBg: "bg-hotel-50",
     chipText: "text-hotel-700",
@@ -43,8 +43,8 @@ export const PROFILE_META: Record<
     label: "Graphic Design",
     accent: "text-design-400",
     accentBg: "bg-design",
-    tintBg: "bg-design/15",
-    tintText: "text-design-400",
+    tintBg: "bg-design-50",
+    tintText: "text-design-700",
     ring: "ring-design/30",
     chipBg: "bg-design-50",
     chipText: "text-design-700",
@@ -55,8 +55,8 @@ export const PROFILE_META: Record<
     label: "Freelance",
     accent: "text-freelance-400",
     accentBg: "bg-freelance",
-    tintBg: "bg-freelance/15",
-    tintText: "text-freelance-400",
+    tintBg: "bg-freelance-50",
+    tintText: "text-freelance-700",
     ring: "ring-freelance/30",
     chipBg: "bg-freelance-50",
     chipText: "text-freelance-700",
@@ -67,8 +67,8 @@ export const PROFILE_META: Record<
     label: "General",
     accent: "text-slate-300",
     accentBg: "bg-slate-500",
-    tintBg: "bg-white/10",
-    tintText: "text-white",
+    tintBg: "bg-slate-100",
+    tintText: "text-slate-800",
     ring: "ring-white/20",
     chipBg: "bg-slate-100",
     chipText: "text-slate-700",
@@ -145,15 +145,15 @@ export default function ProfileTabs({
             className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
               isActive
                 ? `${meta.tintBg} ${meta.tintText}`
-                : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                : "text-slate-500 hover:bg-slate-100/80 hover:text-slate-800"
             }`}
           >
             <span
               className={`flex h-8 w-8 items-center justify-center rounded-lg ${
-                isActive ? meta.accentBg : "bg-white/5 group-hover:bg-white/10"
+                isActive ? meta.accentBg : "bg-slate-100 group-hover:bg-white"
               }`}
             >
-              <ProfileIcon profile={t} className={`h-[18px] w-[18px] ${isActive ? "text-white" : "text-slate-400 group-hover:text-slate-200"}`} />
+              <ProfileIcon profile={t} className={`h-[18px] w-[18px] ${isActive ? "text-white" : "text-slate-400 group-hover:text-slate-700"}`} />
             </span>
             {meta.label}
           </button>
