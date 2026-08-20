@@ -787,17 +787,16 @@ export default function RequestPage() {
                             <label className={labelCls}>
                               Priority level
                             </label>
-                            <div className="grid grid-cols-4 gap-1.5">
+                            <div className="grid grid-cols-2 gap-1.5">
                               {PRIORITY_OPTIONS.map((p) => (
                                 <button
                                   key={p.value}
                                   type="button"
                                   onClick={() => setPriority(p.value)}
-                                  title={p.label}
-                                  className={`flex items-center justify-center gap-1 ${chipCls(priority === p.value)}`}
+                                  className={`flex items-center justify-center gap-1.5 ${chipCls(priority === p.value)}`}
                                 >
                                   <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${p.dot}`} />
-                                  <span className="truncate">{p.label}</span>
+                                  {p.label}
                                 </button>
                               ))}
                             </div>
