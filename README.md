@@ -9,6 +9,29 @@ One dashboard for all three of your jobs: Hotel Operations / Revenue / F&B, Grap
 - **Graphic Design** — the same, plus a kanban board (New → In Progress → Review → Delivered) for design requests, each with a client name, priority, and due date.
 - **Freelance** — the same, plus a project tracker (Lead → Active → In Review → Delivered → Paid) with client, deadline, and rate.
 - One shared password gate, since this will be reachable on the internet.
+- **Restaurant POS** (`/pos`) — a separate, full restaurant point-of-sale and management system living in the same app. See below.
+
+## Restaurant POS module (`/pos`)
+
+A full restaurant POS/management system, built on the same stack (Next.js + Neon Postgres + Vercel) so it deploys with zero extra setup — no new environment variables, no separate database.
+
+It is intentionally **separate from the WorkFlow password gate above**: restaurant staff sign in with their own name + PIN (tap your name, enter a 4–6 digit PIN), not the shared `WORKFLOW_PASSWORD`. A default `Admin` account is seeded on first run with PIN `1234` — change it immediately from **Staff** after logging in.
+
+**What's fully wired up:**
+- Role-based staff accounts (admin/owner/manager/supervisor/cashier/waiter/kitchen/bar/inventory/accountant) with coarse per-role permissions
+- Menu management: categories, items (dine-in/takeaway/delivery pricing, cost price, tax, kitchen station, prep time), modifier groups & add-ons, per-item recipes
+- Table management: dining areas, a drag-to-arrange floor plan, live table status
+- POS order screen: order types, table/customer/waiter selection, modifiers, item notes, hold/recall, send-to-kitchen, discounts (with manager-PIN authorization above a configurable limit), void/complimentary (with manager-PIN authorization), split-by-item and split-payment-across-methods billing, printable/receipt page
+- Kitchen Display System: station tickets, live status (new → preparing → ready → served), delay highlighting
+- Customers (search, loyalty points, visit history) and reservations (status pipeline)
+- Inventory: ingredients, stock movements, automatic recipe-based stock deduction on sale, wastage logging with manager approval, low-stock alerts
+- Purchasing: suppliers, purchase orders, goods-received stock updates
+- Expenses, shift open/close with cash reconciliation
+- Dashboard (today's KPIs, hourly/14-day sales, top items, low stock) and exportable sales reports (by category/item/waiter/cashier/payment method/order type/table)
+- Full audit log for discounts, voids, comps, stock adjustments, staff/role/settings changes
+- A guest-facing QR ordering page (`/menu/[tableId]`) — browse, customize, and submit an order that lands in the POS for staff to review before it's sent to the kitchen; "Request Bill" flips the table status
+
+**Deliberately simplified / not built (call these out if you need them next):** true multi-outlet operation (the schema has `outlet_id` everywhere, but the UI assumes one outlet), hotel PMS/room-charge integration (Room Charge exists as a payment method with room/guest fields, but there's no live PMS API call), happy-hour/seasonal pricing rules, combo meals, offline-mode order taking with background sync, delivery driver dispatch/live tracking, email/WhatsApp receipt delivery (the receipt page is printable/PDF-via-browser only), merge-orders (split-by-item is supported; merging two existing orders back together is not).
 
 ## 1. Put this on GitHub
 
