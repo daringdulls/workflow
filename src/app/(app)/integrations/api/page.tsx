@@ -18,6 +18,8 @@ const WEBHOOK_ROUTES = [
   { path: "/api/v1/webhooks/pms", appKey: "pms", desc: "Room assignment and check-in/out status from Pixel PMS." },
   { path: "/api/v1/webhooks/restaurant", appKey: "restaurant", desc: "Order activity from Pixel Restaurant Order Manager." },
   { path: "/api/v1/webhooks/reputation", appKey: "reputation", desc: "New reviews from Pixel Reputation Manager." },
+  { path: "/api/v1/webhooks/whatsapp", appKey: "whatsapp", desc: "Inbound guest WhatsApp messages — Meta Cloud API webhook, signed with WHATSAPP_APP_SECRET." },
+  { path: "/api/v1/webhooks/email", appKey: "email", desc: "Inbound guest emails — point your provider here with ?secret=EMAIL_INBOUND_SECRET." },
 ];
 
 export default function WebhooksApiPage() {

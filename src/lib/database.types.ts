@@ -44,6 +44,7 @@ export type TransactionStatus = "pending" | "completed" | "voided" | "refunded";
 export type ReviewPlatform = "google" | "tripadvisor" | "booking_com" | "expedia" | "facebook" | "other";
 export type ReviewSentiment = "positive" | "neutral" | "negative";
 export type ReviewResponseStatus = "pending" | "responded" | "not_required";
+export type AiDraftStatus = "pending" | "approved" | "rejected" | "sent";
 
 export interface Organization {
   id: string;
@@ -479,6 +480,39 @@ export interface Review {
   staff_assigned: string | null;
 }
 
+export interface SuggestedQuotation {
+  property_code: string;
+  room_type_code: string | null;
+  arrival_date: string;
+  departure_date: string;
+  meal_plan: string | null;
+  currency: string;
+  accommodation_amount: number;
+  notes: string | null;
+}
+
+export interface AiDraft {
+  id: string;
+  organization_id: string;
+  lead_id: string | null;
+  guest_id: string | null;
+  channel: CommunicationChannel;
+  contact_address: string | null;
+  inbound_message: string;
+  draft_reply: string;
+  suggested_quotation: SuggestedQuotation | null;
+  needs_more_info: string[];
+  confidence: string | null;
+  tool_log: Json;
+  model_used: string;
+  status: AiDraftStatus;
+  quotation_id: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  sent_at: string | null;
+  created_at: string;
+}
+
 type Table<Row> = { Row: Row; Insert: Partial<Row>; Update: Partial<Row>; Relationships: [] };
 
 export interface Database {
@@ -510,6 +544,7 @@ export interface Database {
       dive_bookings: Table<DiveBooking>;
       pos_transactions: Table<PosTransaction>;
       reviews: Table<Review>;
+      ai_drafts: Table<AiDraft>;
     };
     Views: {};
     Functions: {
