@@ -17,10 +17,15 @@ export async function approveAndSend(draftId: string, formData: FormData) {
   if (!draft) throw new Error("Draft not found.");
 
   const finalReply = String(formData.get("draft_reply") ?? draft.draft_reply).trim();
-  const includeQuote = formData.get("create_quotation") === "on" && draft.suggested_quotation;
 
-  let quotationId: string | null = null;
-  if (includeQuote) {
+  // The agent may already have created a real draft quotation via the
+  // create_quotation tool (quotation_id is set) — don't re-create it, just
+  // reference it. Only build one from the legacy suggested_quotation JSON
+  // for older rows that predate the tool-based flow.
+  let quotationId: string | null = draft.quotation_id;
+  const includeLegacyQuote = !quotationId && formData.get("create_quotation") === "on" && draft.suggested_quotation;
+
+  if (includeLegacyQuote) {
     const q = draft.suggested_quotation as any;
     const { data: property } = await supabase
       .from("properties")
@@ -65,6 +70,10 @@ export async function approveAndSend(draftId: string, formData: FormData) {
     sendResult = await sendWhatsAppMessage(draft.contact_address!, finalReply);
   } else if (draft.channel === "email") {
     sendResult = await sendEmail(draft.contact_address!, "Re: your inquiry", finalReply);
+  }
+
+  if (quotationId && sendResult.sent) {
+    await supabase.from("quotations").update({ status: "sent" }).eq("id", quotationId).eq("status", "draft");
   }
 
   await supabase

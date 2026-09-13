@@ -13,9 +13,10 @@ export interface InboundInquiry {
 /**
  * Shared pipeline for every inbound B2C channel: resolve the organization,
  * match/create the guest and lead, log the inbound message, run the Pixel AI
- * agent, and either auto-reply (Level 3 — pure informational, high
- * confidence, org opted in) or leave a draft for staff to review (Level 2) or
- * escalate to a human (no confident, grounded answer available).
+ * agent (which may itself create/send a quotation or flag a booking request —
+ * see src/lib/ai-agent.ts for how those are safely gated), and either
+ * auto-reply (Level 3 — pure informational, high confidence, org opted in),
+ * leave a draft for staff to review (Level 2), or escalate to a human.
  */
 export async function handleInboundInquiry(inquiry: InboundInquiry) {
   const supabase = createServiceClient();
@@ -86,6 +87,14 @@ export async function handleInboundInquiry(inquiry: InboundInquiry) {
     .order("occurred_at", { ascending: true })
     .limit(10);
 
+  // Existing quotations let the agent resend/reference without re-pricing.
+  const { data: existingQuotations } = await supabase
+    .from("quotations")
+    .select("quotation_number, status, total_amount, currency, arrival_date, departure_date, expiry_date")
+    .eq("lead_id", leadId)
+    .order("created_at", { ascending: false })
+    .limit(5);
+
   await supabase.from("communications").insert({
     organization_id: org.id,
     guest_id: guest?.id ?? null,
@@ -99,22 +108,29 @@ export async function handleInboundInquiry(inquiry: InboundInquiry) {
   const agentResult = await runInquiryAgent(
     {
       organizationId: org.id,
+      leadId,
+      guestId: guest?.id ?? null,
       channel: inquiry.channel,
       guestName,
       contactAddress: inquiry.contactAddress,
       message: inquiry.message,
       priorMessages: history ?? [],
+      existingQuotations: existingQuotations ?? [],
     },
     supabase
   );
 
-  // Level 3: pure informational, high-confidence, not escalated, and the org
-  // has opted in — safe to auto-send. Anything with a quote, or that isn't
-  // fully confident, always waits for a human (Level 2).
+  const touchedQuotation = agentResult.quotationId !== null;
+
+  // Level 3: pure informational, high-confidence, not escalated, no quotation
+  // or booking request involved, and the org has opted in — safe to
+  // auto-send. A resend of an existing quotation already happened for real
+  // inside send_quotation, so it isn't re-sent here.
   const canAutoReply =
     org.ai_auto_reply_enabled &&
     !agentResult.escalate &&
-    agentResult.suggestedQuotation === null &&
+    !touchedQuotation &&
+    !agentResult.bookingRequested &&
     agentResult.confidence === "high" &&
     agentResult.needsMoreInfo.length === 0;
 
@@ -126,8 +142,26 @@ export async function handleInboundInquiry(inquiry: InboundInquiry) {
         : await sendEmail(inquiry.contactAddress, "Re: your inquiry", agentResult.replyDraft);
   }
 
-  const autoSent = Boolean(sendResult?.sent);
-  const status = agentResult.escalate ? "human_required" : autoSent ? "sent" : "pending";
+  const autoSentReply = Boolean(sendResult?.sent);
+  const status = agentResult.escalate
+    ? "human_required"
+    : agentResult.autoSentQuotation
+      ? "sent"
+      : autoSentReply
+        ? "sent"
+        : "pending";
+
+  const actionSummary = agentResult.escalate
+    ? `Escalated — ${agentResult.escalationReason ?? "no confident, grounded answer"}`
+    : agentResult.bookingRequested
+      ? `Booking confirmation requested for ${agentResult.quotationNumber} — staff notified, awaiting reply`
+      : agentResult.autoSentQuotation
+        ? `Resent existing quotation ${agentResult.quotationNumber} (Level 3)`
+        : agentResult.sendGated
+          ? `Prepared quotation ${agentResult.quotationNumber} (${agentResult.quotationCurrency} ${agentResult.quotationTotal}) — awaiting approval to send`
+          : autoSentReply
+            ? "Auto-replied (Level 3 — informational, high confidence)"
+            : "Drafted reply, awaiting approval";
 
   const { data: draft, error: draftError } = await supabase
     .from("ai_drafts")
@@ -139,7 +173,8 @@ export async function handleInboundInquiry(inquiry: InboundInquiry) {
       contact_address: inquiry.contactAddress,
       inbound_message: inquiry.message,
       draft_reply: agentResult.replyDraft,
-      suggested_quotation: agentResult.suggestedQuotation,
+      suggested_quotation: null,
+      quotation_id: agentResult.quotationId,
       needs_more_info: agentResult.needsMoreInfo,
       confidence: agentResult.confidence,
       tool_log: agentResult.toolLog,
@@ -147,21 +182,15 @@ export async function handleInboundInquiry(inquiry: InboundInquiry) {
       intent: agentResult.intent,
       escalated: agentResult.escalate,
       escalation_reason: agentResult.escalationReason,
-      ai_action_summary: agentResult.escalate
-        ? `Escalated — ${agentResult.escalationReason ?? "no confident, grounded answer"}`
-        : autoSent
-          ? "Auto-replied (Level 3 — informational, high confidence)"
-          : agentResult.suggestedQuotation
-            ? "Generated quotation, awaiting approval"
-            : "Drafted reply, awaiting approval",
+      ai_action_summary: actionSummary,
       status,
-      sent_at: autoSent ? new Date().toISOString() : null,
+      sent_at: status === "sent" ? new Date().toISOString() : null,
     })
     .select("id")
     .single();
   if (draftError) throw new Error(draftError.message);
 
-  if (autoSent) {
+  if (autoSentReply) {
     await supabase.from("communications").insert({
       organization_id: org.id,
       guest_id: guest?.id ?? null,
@@ -173,7 +202,8 @@ export async function handleInboundInquiry(inquiry: InboundInquiry) {
   }
 
   // Notify staff for anything that isn't a fully-automatic Level 3 reply.
-  if (!autoSent) {
+  // (Booking requests already got their own notification from create_booking.)
+  if (status !== "sent" && !agentResult.bookingRequested) {
     const { data: staff } = await supabase.from("profiles").select("id").eq("organization_id", org.id).eq("is_org_admin", true);
     if (staff && staff.length > 0) {
       await supabase.from("notifications").insert(
@@ -191,5 +221,5 @@ export async function handleInboundInquiry(inquiry: InboundInquiry) {
     }
   }
 
-  return { leadId, draftId: draft.id, autoSent };
+  return { leadId, draftId: draft.id, autoSent: status === "sent" };
 }

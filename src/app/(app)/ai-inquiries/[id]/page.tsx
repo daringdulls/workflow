@@ -1,11 +1,11 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle2, TriangleAlert, Wrench, ShieldAlert } from "lucide-react";
+import { CheckCircle2, TriangleAlert, Wrench, ShieldAlert, FileText } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { formatCurrency, formatDate, formatDateTime, titleCase } from "@/lib/format";
-import { AI_DRAFT_STATUS_TONE } from "@/lib/status-styles";
+import { AI_DRAFT_STATUS_TONE, QUOTATION_STATUS_TONE } from "@/lib/status-styles";
 import { approveAndSend, rejectDraft } from "../actions";
 
 export default async function AiInquiryDetailPage({
@@ -19,7 +19,15 @@ export default async function AiInquiryDetailPage({
   const { data: draft } = await supabase.from("ai_drafts").select("*, leads(guest_name, id)").eq("id", params.id).maybeSingle();
   if (!draft) notFound();
 
-  const quote = draft.suggested_quotation as any;
+  const { data: quotation } = draft.quotation_id
+    ? await supabase
+        .from("quotations")
+        .select("id, quotation_number, status, total_amount, currency, arrival_date, departure_date, meal_plan, terms, properties(name), room_types(name)")
+        .eq("id", draft.quotation_id)
+        .maybeSingle()
+    : { data: null };
+
+  const legacyQuote = !quotation ? (draft.suggested_quotation as any) : null;
   const toolLog = (draft.tool_log as any[]) ?? [];
   const approveWithId = approveAndSend.bind(null, draft.id);
   const rejectWithId = rejectDraft.bind(null, draft.id);
@@ -50,9 +58,7 @@ export default async function AiInquiryDetailPage({
         <p className="whitespace-pre-wrap text-sm text-navy-800">{draft.inbound_message}</p>
       </div>
 
-      {draft.ai_action_summary && (
-        <p className="text-xs text-slate-400">{draft.ai_action_summary}</p>
-      )}
+      {draft.ai_action_summary && <p className="text-xs text-slate-400">{draft.ai_action_summary}</p>}
 
       {draft.escalated && (
         <div className="flex items-start gap-2 rounded-xl bg-danger-50 px-4 py-3 text-sm text-danger-600">
@@ -84,19 +90,43 @@ export default async function AiInquiryDetailPage({
           <textarea id="draft_reply" name="draft_reply" defaultValue={draft.draft_reply} rows={6} disabled={!canAct} className="input" />
         </div>
 
-        {quote && (
+        {quotation && (
+          <div className="rounded-xl border border-slate-100 bg-surface-alt/40 p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="flex items-center gap-1.5 text-sm font-medium text-navy-900">
+                <FileText className="h-4 w-4 text-brand-600" /> Quotation {quotation.quotation_number}
+              </p>
+              <StatusBadge status={quotation.status} tone={QUOTATION_STATUS_TONE[quotation.status] ?? "slate"} />
+            </div>
+            <p className="mb-2 text-xs text-slate-500">
+              Already created by Pixel AI from live availability, rates and offers — approving here sends the reply above and marks it sent.
+            </p>
+            <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+              <Info label="Property" value={(quotation as any).properties?.name ?? "—"} />
+              <Info label="Room type" value={(quotation as any).room_types?.name ?? "—"} />
+              <Info label="Meal plan" value={quotation.meal_plan ?? "—"} />
+              <Info label="Dates" value={quotation.arrival_date ? `${formatDate(quotation.arrival_date)} → ${formatDate(quotation.departure_date)}` : "—"} />
+              <Info label="Total" value={formatCurrency(quotation.total_amount, quotation.currency)} />
+            </div>
+            <Link href={`/quotations/${quotation.id}`} className="mt-2 inline-block text-xs font-medium text-brand-600 hover:underline">
+              View / edit full quotation →
+            </Link>
+          </div>
+        )}
+
+        {legacyQuote && (
           <div className="rounded-xl border border-slate-100 bg-surface-alt/40 p-4">
             <label className="mb-2 flex items-center gap-2 text-sm font-medium text-navy-900">
               <input type="checkbox" name="create_quotation" defaultChecked disabled={!canAct} className="h-4 w-4 rounded border-slate-300 text-brand-600" />
               Create a draft quotation from this suggestion
             </label>
             <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
-              <Info label="Property" value={quote.property_code} />
-              <Info label="Room type" value={quote.room_type_code ?? "—"} />
-              <Info label="Meal plan" value={quote.meal_plan ?? "—"} />
-              <Info label="Dates" value={`${formatDate(quote.arrival_date)} → ${formatDate(quote.departure_date)}`} />
-              <Info label="Accommodation" value={formatCurrency(quote.accommodation_amount, quote.currency)} />
-              {quote.notes && <Info label="Notes" value={quote.notes} />}
+              <Info label="Property" value={legacyQuote.property_code} />
+              <Info label="Room type" value={legacyQuote.room_type_code ?? "—"} />
+              <Info label="Meal plan" value={legacyQuote.meal_plan ?? "—"} />
+              <Info label="Dates" value={`${formatDate(legacyQuote.arrival_date)} → ${formatDate(legacyQuote.departure_date)}`} />
+              <Info label="Accommodation" value={formatCurrency(legacyQuote.accommodation_amount, legacyQuote.currency)} />
+              {legacyQuote.notes && <Info label="Notes" value={legacyQuote.notes} />}
             </div>
           </div>
         )}

@@ -123,23 +123,29 @@ narrowly-scoped tool, so it can propose but never fabricate.
    transfers, meal plan) and calls tools — `check_availability`,
    `get_room_rates`, `get_dive_rates`, `get_transfer_rates`,
    `get_active_offers`, `search_knowledge_base`, `get_guest`,
-   `get_booking_status` — to ground every claim. It computes quote totals
-   itself from the unit prices those tools return (nights × rate, dives ×
-   per-person price, offer discount applied) — it never asks the model to
-   recall a price from memory.
+   `get_booking_status`, `create_quotation`, `send_quotation`,
+   `create_booking` — to ground every claim and, where appropriate, act.
+   It computes quote totals itself from the unit prices tools return (nights
+   × rate, dives × per-person price, offer discount applied) and only ever
+   states a price by calling `create_quotation` — never in free text.
 4. If nothing grounds a confident answer, the agent sets `escalate: true`
    instead of guessing — the draft lands as **Human Required**, not sent.
 5. Otherwise the draft lands in the **AI Inbox** (sidebar → CRM & Sales → AI
-   Inbox) for review, unless it qualifies for Level 3 auto-reply (below).
+   Inbox) for review, unless it qualifies for Level 3 auto-send (below).
 
-### Authority levels
+### Authority levels — real tools, server-enforced gating
+
+`create_quotation`, `send_quotation` and `create_booking` are real,
+callable tools — the agent decides when to use them. What each one is
+*allowed* to do is enforced inside the tool's own server-side implementation
+(`src/lib/ai-agent.ts`), not by the model's judgment:
 
 | Level | What | Enforcement |
 |---|---|---|
-| **1 — Answer only** | Read-only tool calls (availability, rates, knowledge base, booking status) | The agent has no tool that writes anything |
-| **2 — Prepare actions** | Any reply that includes a quotation | Always lands as `pending` in the AI Inbox — never auto-sent, regardless of confidence |
-| **3 — Automatic low-risk** | Pure informational replies (hotel info, policies, dive requirements — no quote) | Auto-sent **only** when `confidence: high`, not escalated, no quote, and the organization has opted in (Organizations → toggle "Let Pixel AI auto-send Level 3 replies") |
-| **4 — Sensitive, human-only** | Discounts, rate overrides, booking confirmation/cancellation, refunds, date changes | The agent has **no tools** for any of these — they only happen through the normal Quotations/Reservations UI, by a person |
+| **1 — Answer only** | Read-only tool calls (availability, rates, knowledge base, booking status, guest lookup) | These tools have no write path at all |
+| **2 — Prepare actions** | `create_quotation` (always executes — safe, the guest never sees a draft) and `send_quotation` on a **brand-new** quotation | `send_quotation` checks the quotation's status: `draft` (never sent before) → it does **not** deliver anything, it returns `queued_for_approval: true` and the draft lands as `pending` in the AI Inbox for a human to approve |
+| **3 — Automatic low-risk** | Pure informational replies (no quotation touched), and `send_quotation` on an **existing, already-sent** quotation (a guest asking to resend) | Auto-executes when `confidence: high`, not escalated, and (for informational replies) the organization has opted in (Organizations → "Let Pixel AI auto-send Level 3 replies"). Resending an existing quotation always executes for real — nothing new is being decided, just redelivered |
+| **4 — Sensitive, human-only** | `create_booking`, discounts, rate overrides, cancellations, refunds, date changes | `create_booking` **never creates a reservation** — it only notifies staff with a link to the quotation. There is no tool at all for discounts/overrides/cancellations/refunds — no code path exists for the agent to perform them |
 
 ### Knowledge Base
 

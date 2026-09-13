@@ -1,8 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import type { createServiceClient } from "@/lib/supabase/server";
-import type { SuggestedQuotation } from "@/lib/database.types";
 import { sourceLabel } from "@/lib/knowledge";
+import { sendWhatsAppMessage } from "@/lib/notify/whatsapp";
+import { sendEmail } from "@/lib/notify/email";
 
 type ServiceClient = ReturnType<typeof createServiceClient>;
 
@@ -11,18 +12,6 @@ const MODEL = "claude-opus-5";
 const FinalAnswerSchema = z.object({
   intent: z.string(),
   guest_reply: z.string(),
-  quote: z
-    .object({
-      property_code: z.string(),
-      room_type_code: z.string().nullable(),
-      arrival_date: z.string(),
-      departure_date: z.string(),
-      meal_plan: z.string().nullable(),
-      currency: z.string(),
-      accommodation_amount: z.number(),
-      notes: z.string().nullable(),
-    })
-    .nullable(),
   needs_more_info: z.array(z.string()),
   confidence: z.enum(["high", "medium", "low"]),
   escalate: z.boolean(),
@@ -35,51 +24,78 @@ export interface AgentToolLogEntry {
   result_summary: string;
 }
 
+export interface ExistingQuotationSummary {
+  quotation_number: string;
+  status: string;
+  total_amount: number;
+  currency: string;
+  arrival_date: string | null;
+  departure_date: string | null;
+  expiry_date: string | null;
+}
+
 export interface AgentInput {
   organizationId: string;
+  leadId: string | null;
+  guestId: string | null;
   channel: "whatsapp" | "email";
   guestName: string | null;
   contactAddress: string;
   message: string;
   /** Prior messages on this thread, oldest first — gives the agent conversation continuity. */
   priorMessages?: { direction: "inbound" | "outbound" | "internal"; message: string }[];
+  /** Quotations already on file for this lead, so the agent can reference/resend without re-pricing. */
+  existingQuotations?: ExistingQuotationSummary[];
 }
 
 export interface AgentResult {
   intent: string;
   replyDraft: string;
-  suggestedQuotation: SuggestedQuotation | null;
   needsMoreInfo: string[];
   confidence: string;
   escalate: boolean;
   escalationReason: string | null;
   toolLog: AgentToolLogEntry[];
   modelUsed: string;
+  /** Set when create_quotation was called this run — a real draft quotation now exists. */
+  quotationId: string | null;
+  quotationNumber: string | null;
+  quotationTotal: number | null;
+  quotationCurrency: string | null;
+  /** send_quotation was called on a brand-new (never-before-sent) quotation — gated, needs staff approval. */
+  sendGated: boolean;
+  /** send_quotation actually dispatched a previously-sent quotation being resent (Level 3). */
+  autoSentQuotation: boolean;
+  /** create_booking was called — always requires staff confirmation, never auto-books. */
+  bookingRequested: boolean;
 }
 
 // ── Authority levels ────────────────────────────────────────────────────────
-// Level 1  Answer only — read tools, no pricing, no side effects.
-// Level 2  Prepare actions — quotation math is computed, but a human always
-//          approves before anything is sent (never auto-sent, regardless of
-//          confidence).
-// Level 3  Automatic low-risk replies — pure informational answers (no quote)
-//          may be auto-sent when the org has enabled it AND confidence is high
-//          AND the agent did not escalate. Enforced by the caller
-//          (handleInboundInquiry), not by this module.
-// Level 4  Sensitive actions (discounts, rate overrides, booking confirmation/
-//          cancellation, refunds, date changes) — this agent has NO tools that
-//          can perform these. They stay human-only, done through the normal
-//          Quotations/Reservations UI.
+// Level 1  Answer only — read-only tools, no side effects.
+// Level 2  Prepare actions — create_quotation writes a real draft quotation
+//          (safe: nothing has reached the guest yet). Calling send_quotation
+//          on that brand-new draft does NOT deliver it — Pixel Core gates it
+//          for staff approval. This is enforced inside the send_quotation
+//          tool implementation itself, not by the model's judgment.
+// Level 3  Automatic low-risk actions — resending an EXISTING, already-sent
+//          quotation (send_quotation on a non-draft quotation) is safe and
+//          executes for real, same as purely informational replies (handled
+//          by the caller, handleInboundInquiry, for non-quotation answers).
+// Level 4  Sensitive, human-only — create_booking NEVER creates a
+//          reservation itself; it only flags the quotation for staff
+//          confirmation. Discounts, rate overrides, cancellations and
+//          refunds have no tool at all — there is no code path for the
+//          agent to perform them.
 
 const SYSTEM_PROMPT = `You are the Pixel AI reservations assistant for a hospitality group on Pixel Core. \
 A guest inquiry has come in over WhatsApp or email, possibly as part of an ongoing conversation. \
-Draft a warm, professional, accurate reply that a staff member will review before it is sent — you \
-never send anything yourself and you never confirm a booking.
+Draft a warm, professional, accurate reply — you have real tools, but Pixel Core enforces what's safe to \
+execute automatically versus what needs a human, regardless of what you decide to call.
 
-AI decides what to ask. Pixel Core decides what is true. Ground every fact — availability, prices, \
-taxes, offers, transfer prices, room inventory, booking status, hotel/dive/restaurant information, \
-policies — in a tool result. Never invent or estimate any of these. If tools return no data for what \
-you need, say so in the reply and set escalate accordingly rather than guessing.
+AI decides what to ask. Pixel Core decides what is true. Ground every fact — availability, prices, taxes, \
+offers, transfer prices, room inventory, booking status, hotel/dive/restaurant information, policies — in \
+a tool result. Never invent or estimate any of these, and never state a price you haven't produced through \
+create_quotation. If tools return no data for what you need, say so and set escalate rather than guessing.
 
 When a guest asks about accommodation, diving, transfers or a package:
 1. Identify what they're asking for: dates, number of guests, property, room needs, diving (and how many \
@@ -90,47 +106,43 @@ island or area name) or ask which property they mean.
 get_transfer_rates when transfers/flights are mentioned. Call get_active_offers and apply any offer whose \
 trigger is met (e.g. a minimum-nights offer) — do the discount arithmetic yourself from the returned \
 discount_type/discount_value, never invent a percentage.
-4. Build the total quote strictly from the numbers tools returned (nights × room rate, dives × per-person \
-dive price × number of guests, transfers × per-person price × guests, minus any applicable offer). Show \
-this breakdown in the reply so it's easy for staff to verify.
+4. Once you have every number from tools, call create_quotation with the full breakdown (accommodation, \
+diving, transfers, discount) — this is what actually produces a quote; never just describe a price in text. \
+It writes a real draft record, which is safe (the guest hasn't seen it yet).
+5. Then call send_quotation with the quotation_number you just got. If it's brand new, Pixel Core will \
+queue it for staff approval instead of delivering it — that's expected, not an error. Phrase guest_reply \
+accordingly ("I've put together a quote for you and I'm just getting it finalized — it'll be with you \
+shortly") rather than claiming it's already sent.
+6. If the guest is asking you to resend a quote they already have (see "Existing quotations" in the \
+context below), call send_quotation with that existing quotation_number instead of creating a new one — \
+resending something already sent is fine to actually deliver.
+7. If a guest says they want to book / confirm / go ahead with a quotation, call create_booking with its \
+quotation_number. This never confirms a booking by itself — it flags it for staff. Tell the guest a team \
+member will confirm shortly, not that the booking is confirmed.
 
 For non-transactional questions (hotel facilities, check-in time, dive requirements, cancellation policy, \
-restaurant info, island information, FAQs), call search_knowledge_base. Only answer from what it returns, \
-and mention you're happy to send more detail — never fabricate policy details. If search_knowledge_base \
-returns nothing relevant, do not guess: set escalate to true instead ("I'll check this with our \
+restaurant info, island information, FAQs), call search_knowledge_base. Only answer from what it returns. \
+If it returns nothing relevant, do not guess: set escalate to true instead ("I'll check this with our \
 reservations team." style reply) with a clear escalation_reason.
 
-Use get_guest for returning-guest context (VIP status, past stays) and get_booking_status when a guest \
-asks about an existing booking. Do not attempt to modify a booking, apply a discount, override a rate, or \
-confirm/cancel anything — those require staff action outside this conversation; if asked, say a team \
-member will help and set escalate to true.
+Use get_guest for returning-guest context and get_booking_status when a guest asks about an existing \
+reservation. There is no tool to apply a discount, override a rate, or cancel/refund anything — if asked, \
+say a team member will help and set escalate to true.
 
-If you don't have enough information to check availability or pricing (missing dates, property, or guest \
-count), don't guess — ask a clarifying question in guest_reply and list what's missing in needs_more_info.
+If you don't have enough information to check availability or price something, don't guess — ask a \
+clarifying question in guest_reply and list what's missing in needs_more_info.
 
 Set intent to a short label such as "quotation_request", "availability_check", "faq", "booking_status", \
-"escalation", or "other".
+"booking_request", "escalation", or "other".
 
-Keep guest_reply concise, friendly, and ready to send with only minor edits. A quote is not a confirmed \
-booking until staff follow up.
+Keep guest_reply concise, friendly, and ready to send with only minor edits.
 
-End your final turn with exactly one fenced json code block matching this shape (quote is null unless you \
-have a fully tool-grounded price; escalation_reason is null unless escalate is true):
+End your final turn with exactly one fenced json code block matching this shape:
 
 \`\`\`json
 {
   "intent": "string",
   "guest_reply": "string",
-  "quote": {
-    "property_code": "string",
-    "room_type_code": "string or null",
-    "arrival_date": "YYYY-MM-DD",
-    "departure_date": "YYYY-MM-DD",
-    "meal_plan": "string or null",
-    "currency": "string",
-    "accommodation_amount": 0,
-    "notes": "string or null — include the full breakdown (accommodation, diving, transfers, offer applied) here"
-  } | null,
   "needs_more_info": ["string"],
   "confidence": "high" | "medium" | "low",
   "escalate": true | false,
@@ -253,10 +265,80 @@ function tools(): Anthropic.Tool[] {
         additionalProperties: false,
       },
     },
+    {
+      name: "create_quotation",
+      description:
+        "Create a draft quotation from tool-grounded numbers only. Safe to call once you have real availability and " +
+        "rate/dive/transfer/offer data — it writes a draft record the guest never sees until send_quotation delivers it. " +
+        "Returns quotation_number and total_amount.",
+      input_schema: {
+        type: "object",
+        properties: {
+          property_code: { type: "string" },
+          room_type_code: { type: "string" },
+          arrival_date: { type: "string", description: "YYYY-MM-DD" },
+          departure_date: { type: "string", description: "YYYY-MM-DD" },
+          meal_plan: { type: "string" },
+          currency: { type: "string" },
+          accommodation_amount: { type: "number" },
+          dive_amount: { type: "number", description: "Total diving cost across all guests, default 0" },
+          transfer_amount: { type: "number", description: "Total transfer cost across all guests, default 0" },
+          discount_amount: { type: "number", description: "Total discount applied from an active offer, default 0" },
+          notes: { type: "string", description: "Breakdown explanation for staff, e.g. which offer was applied and how the total was computed." },
+        },
+        required: ["property_code", "arrival_date", "departure_date", "currency", "accommodation_amount"],
+        additionalProperties: false,
+      },
+    },
+    {
+      name: "send_quotation",
+      description:
+        "Send a quotation to the guest. If this quotation_number is brand new (never sent before), Pixel Core queues it " +
+        "for staff approval instead of delivering it — you'll get queued_for_approval: true back, which is expected, not " +
+        "an error. If it was already sent before, this resends it for real.",
+      input_schema: {
+        type: "object",
+        properties: { quotation_number: { type: "string" } },
+        required: ["quotation_number"],
+        additionalProperties: false,
+      },
+    },
+    {
+      name: "create_booking",
+      description:
+        "Flag a quotation as ready to book. This never confirms a reservation by itself — it always notifies staff for " +
+        "confirmation. Use when a guest clearly says they want to proceed with a specific quotation.",
+      input_schema: {
+        type: "object",
+        properties: { quotation_number: { type: "string" } },
+        required: ["quotation_number"],
+        additionalProperties: false,
+      },
+    },
   ];
 }
 
-async function executeTool(supabase: ServiceClient, organizationId: string, name: string, input: any): Promise<unknown> {
+interface ToolContext {
+  supabase: ServiceClient;
+  organizationId: string;
+  leadId: string | null;
+  guestId: string | null;
+  channel: "whatsapp" | "email";
+  contactAddress: string;
+}
+
+interface SideEffects {
+  quotationId: string | null;
+  quotationNumber: string | null;
+  quotationTotal: number | null;
+  quotationCurrency: string | null;
+  sendGated: boolean;
+  autoSentQuotation: boolean;
+  bookingRequested: boolean;
+}
+
+async function executeTool(ctx: ToolContext, name: string, input: any, effects: SideEffects): Promise<unknown> {
+  const { supabase, organizationId } = ctx;
   switch (name) {
     case "list_properties": {
       const { data } = await supabase
@@ -436,9 +518,155 @@ async function executeTool(supabase: ServiceClient, organizationId: string, name
         .maybeSingle();
       return data ?? { note: "No booking found with that number." };
     }
+    case "create_quotation": {
+      if (!ctx.leadId) return { error: "No lead is attached to this conversation — cannot create a quotation." };
+      const property = await findProperty(supabase, organizationId, input.property_code);
+      if (!property) return { error: `Unknown property_code ${input.property_code}` };
+
+      let roomTypeId: string | null = null;
+      if (input.room_type_code) {
+        const rt = await findRoomType(supabase, property.id, input.room_type_code);
+        roomTypeId = rt?.id ?? null;
+      }
+
+      const expiryDate = new Date();
+      expiryDate.setDate(expiryDate.getDate() + 7);
+
+      const { data, error } = await supabase
+        .from("quotations")
+        .insert({
+          organization_id: organizationId,
+          property_id: property.id,
+          lead_id: ctx.leadId,
+          guest_id: ctx.guestId,
+          arrival_date: input.arrival_date,
+          departure_date: input.departure_date,
+          room_type_id: roomTypeId,
+          meal_plan: input.meal_plan ?? null,
+          accommodation_amount: input.accommodation_amount ?? 0,
+          dive_amount: input.dive_amount ?? 0,
+          transfer_amount: input.transfer_amount ?? 0,
+          discount_amount: input.discount_amount ?? 0,
+          currency: input.currency,
+          expiry_date: expiryDate.toISOString().slice(0, 10),
+          terms: input.notes ?? null,
+          status: "draft",
+        })
+        .select("id, quotation_number, total_amount, currency")
+        .single();
+      if (error) return { error: error.message };
+
+      effects.quotationId = data.id;
+      effects.quotationNumber = data.quotation_number;
+      effects.quotationTotal = data.total_amount;
+      effects.quotationCurrency = data.currency;
+
+      await recordAiAction(supabase, organizationId, "quotation", data.id, "created", { quotation_number: data.quotation_number, total_amount: data.total_amount });
+
+      return { quotation_number: data.quotation_number, total_amount: data.total_amount, currency: data.currency };
+    }
+    case "send_quotation": {
+      const { data: quotation } = await supabase
+        .from("quotations")
+        .select("id, status, total_amount, currency, arrival_date, departure_date, meal_plan")
+        .eq("organization_id", organizationId)
+        .eq("quotation_number", input.quotation_number)
+        .maybeSingle();
+      if (!quotation) return { error: `No quotation found with number ${input.quotation_number}` };
+
+      if (quotation.status === "draft") {
+        // Brand new — never sent before. Level 2: gate for staff approval.
+        effects.quotationId = quotation.id;
+        effects.quotationNumber = input.quotation_number;
+        effects.quotationTotal = quotation.total_amount;
+        effects.quotationCurrency = quotation.currency;
+        effects.sendGated = true;
+        return { queued_for_approval: true, message: "New quotation — queued for staff approval before it can be sent." };
+      }
+
+      // Already sent before — Level 3, safe to actually resend.
+      const summary =
+        `Here's your quotation ${input.quotation_number}: ${quotation.currency} ${quotation.total_amount} total` +
+        (quotation.arrival_date ? ` for ${quotation.arrival_date} → ${quotation.departure_date}` : "") +
+        (quotation.meal_plan ? `, ${quotation.meal_plan}` : "") +
+        ".";
+      const sendResult =
+        ctx.channel === "whatsapp" ? await sendWhatsAppMessage(ctx.contactAddress, summary) : await sendEmail(ctx.contactAddress, "Your quotation", summary);
+
+      if (sendResult.sent) {
+        await supabase.from("communications").insert({
+          organization_id: organizationId,
+          guest_id: ctx.guestId,
+          lead_id: ctx.leadId,
+          channel: ctx.channel,
+          direction: "outbound",
+          message: summary,
+        });
+        effects.quotationId = quotation.id;
+        effects.quotationNumber = input.quotation_number;
+        effects.quotationTotal = quotation.total_amount;
+        effects.quotationCurrency = quotation.currency;
+        effects.autoSentQuotation = true;
+        await recordAiAction(supabase, organizationId, "quotation", quotation.id, "resent", { quotation_number: input.quotation_number });
+      }
+
+      return sendResult.sent
+        ? { sent: true, message: "Existing quotation resent to the guest." }
+        : { sent: false, reason: sendResult.reason, message: "Could not resend automatically — tell the guest a team member will follow up with it." };
+    }
+    case "create_booking": {
+      const { data: quotation } = await supabase
+        .from("quotations")
+        .select("id, status, total_amount, currency, quotation_number")
+        .eq("organization_id", organizationId)
+        .eq("quotation_number", input.quotation_number)
+        .maybeSingle();
+      if (!quotation) return { error: `No quotation found with number ${input.quotation_number}` };
+
+      // Always human-only: never creates a reservation, only flags the intent.
+      await supabase.from("quotations").update({ status: "accepted" }).eq("id", quotation.id).in("status", ["sent", "viewed"]);
+
+      const { data: staff } = await supabase.from("profiles").select("id").eq("organization_id", organizationId).eq("is_org_admin", true);
+      if (staff && staff.length > 0) {
+        await supabase.from("notifications").insert(
+          staff.map((s) => ({
+            user_id: s.id,
+            organization_id: organizationId,
+            type: "booking_new" as const,
+            title: "Guest wants to confirm a booking",
+            message: `Quotation ${quotation.quotation_number} (${quotation.currency} ${quotation.total_amount}) — guest asked to proceed. Confirm and convert to a booking.`,
+            link: `/quotations/${quotation.id}`,
+          }))
+        );
+      }
+
+      effects.bookingRequested = true;
+      await recordAiAction(supabase, organizationId, "quotation", quotation.id, "booking_requested", { quotation_number: quotation.quotation_number });
+
+      return { requires_staff_confirmation: true, message: "Flagged for staff confirmation. This is never confirmed automatically." };
+    }
     default:
       return { error: `Unknown tool ${name}` };
   }
+}
+
+async function recordAiAction(
+  supabase: ServiceClient,
+  organizationId: string,
+  entityType: string,
+  entityId: string,
+  action: "created" | "resent" | "booking_requested",
+  detail: Record<string, unknown>
+) {
+  await supabase.from("audit_logs").insert({
+    organization_id: organizationId,
+    user_id: null,
+    application: "pixel_ai",
+    entity_type: entityType,
+    entity_id: entityId,
+    action: action === "created" ? "created" : "status_changed",
+    new_value: { ai_action: action, ...detail },
+  });
 }
 
 async function findProperty(supabase: ServiceClient, organizationId: string, code: string) {
@@ -464,9 +692,27 @@ function extractFinalAnswer(text: string): z.infer<typeof FinalAnswerSchema> | n
 export async function runInquiryAgent(input: AgentInput, supabase: ServiceClient): Promise<AgentResult> {
   const client = new Anthropic();
   const toolLog: AgentToolLogEntry[] = [];
+  const effects: SideEffects = {
+    quotationId: null,
+    quotationNumber: null,
+    quotationTotal: null,
+    quotationCurrency: null,
+    sendGated: false,
+    autoSentQuotation: false,
+    bookingRequested: false,
+  };
+  const ctx: ToolContext = {
+    supabase,
+    organizationId: input.organizationId,
+    leadId: input.leadId,
+    guestId: input.guestId,
+    channel: input.channel,
+    contactAddress: input.contactAddress,
+  };
 
-  const historyText = (input.priorMessages ?? [])
-    .map((m) => `[${m.direction}] ${m.message}`)
+  const historyText = (input.priorMessages ?? []).map((m) => `[${m.direction}] ${m.message}`).join("\n");
+  const quotationsText = (input.existingQuotations ?? [])
+    .map((q) => `${q.quotation_number} (${q.status}): ${q.currency} ${q.total_amount}${q.arrival_date ? `, ${q.arrival_date} → ${q.departure_date}` : ""}`)
     .join("\n");
 
   const messages: Anthropic.MessageParam[] = [
@@ -474,6 +720,7 @@ export async function runInquiryAgent(input: AgentInput, supabase: ServiceClient
       role: "user",
       content:
         (historyText ? `Prior conversation on this thread:\n${historyText}\n\n` : "") +
+        (quotationsText ? `Existing quotations on file for this guest:\n${quotationsText}\n\n` : "") +
         `Channel: ${input.channel}\nGuest name: ${input.guestName ?? "unknown"}\nContact: ${input.contactAddress}\n\nLatest message:\n${input.message}`,
     },
   ];
@@ -498,7 +745,7 @@ export async function runInquiryAgent(input: AgentInput, supabase: ServiceClient
     const toolUseBlocks = response.content.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
     const toolResults: Anthropic.ToolResultBlockParam[] = [];
     for (const toolUse of toolUseBlocks) {
-      const result = await executeTool(supabase, input.organizationId, toolUse.name, toolUse.input);
+      const result = await executeTool(ctx, toolUse.name, toolUse.input, effects);
       toolLog.push({ tool: toolUse.name, input: toolUse.input, result_summary: JSON.stringify(result).slice(0, 500) });
       toolResults.push({ type: "tool_result", tool_use_id: toolUse.id, content: JSON.stringify(result) });
     }
@@ -510,25 +757,25 @@ export async function runInquiryAgent(input: AgentInput, supabase: ServiceClient
     return {
       intent: parsed.intent,
       replyDraft: parsed.guest_reply,
-      suggestedQuotation: parsed.quote,
       needsMoreInfo: parsed.needs_more_info,
       confidence: parsed.confidence,
       escalate: parsed.escalate,
       escalationReason: parsed.escalation_reason,
       toolLog,
       modelUsed: MODEL,
+      ...effects,
     };
   }
 
   return {
     intent: "other",
     replyDraft: finalText || "The assistant could not generate a reply. Please respond to this guest manually.",
-    suggestedQuotation: null,
     needsMoreInfo: ["Agent response could not be parsed — please review and draft a reply manually."],
     confidence: "low",
     escalate: true,
     escalationReason: "Agent output did not match the expected format.",
     toolLog,
     modelUsed: MODEL,
+    ...effects,
   };
 }
