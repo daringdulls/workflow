@@ -13,7 +13,15 @@ const DOT_TONE: Record<Tone, string> = {
   cyan: "bg-cyan-500",
 };
 
+const CUSTOMER_CHANNELS = ["WhatsApp", "Website", "Instagram", "Facebook", "Email", "B2B Portal"];
+
+// Core-native modules (Rate Engine, CRM) are always live — they have no
+// app_connections row because they aren't an external app to connect.
+const NATIVE_MODULES = new Set(["rate_engine", "crm"]);
+
 const TARGETS: { key: string; name: string; fields: string[] }[] = [
+  { key: "rate_engine", name: "Rate Engine", fields: ["Room Rates", "Dive Rates", "Transfer Rates", "Offers"] },
+  { key: "crm", name: "CRM", fields: ["Leads", "Quotations", "AI Inbox"] },
   { key: "pms", name: "PMS", fields: ["Guest", "Stay", "Room", "Meal Plan", "Status"] },
   { key: "availability", name: "Availability", fields: ["Property", "Room Type", "Dates", "Inventory"] },
   { key: "restaurant", name: "Restaurant", fields: ["Guest", "Room", "Meal Plan"] },
@@ -25,11 +33,27 @@ const TARGETS: { key: string; name: string; fields: string[] }[] = [
 ];
 
 export function DataFlow({ apps }: { apps: AppConnection[] }) {
-  const statusFor = (key: string) => apps.find((a) => a.app_key === key)?.status ?? "coming_soon";
+  const statusFor = (key: string) => {
+    if (NATIVE_MODULES.has(key)) return "connected";
+    return apps.find((a) => a.app_key === key)?.status ?? "coming_soon";
+  };
 
   return (
     <div className="card p-5 sm:p-6">
+      <div className="mb-2 flex flex-wrap items-center justify-center gap-1.5">
+        {CUSTOMER_CHANNELS.map((c) => (
+          <span key={c} className="badge bg-slate-100 text-slate-500">
+            {c}
+          </span>
+        ))}
+      </div>
       <div className="flex flex-col items-center gap-1.5 text-center">
+        <ArrowDown className="h-4 w-4 text-slate-300" />
+        <div className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-2 text-sm font-semibold text-brand-700 shadow-card">
+          Pixel AI Agent
+        </div>
+        <p className="text-[11px] text-slate-400">Intent Detection · Knowledge Base · Tool Calling · Approval Rules</p>
+        <ArrowDown className="h-4 w-4 text-slate-300" />
         <div className={clsx("badge", toneClass(APP_CONNECTION_TONE[statusFor("booking_manager")] ?? "slate"))}>
           Pixel Booking Manager
         </div>

@@ -1,19 +1,12 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle2, TriangleAlert, Wrench } from "lucide-react";
+import { CheckCircle2, TriangleAlert, Wrench, ShieldAlert } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { formatCurrency, formatDate, formatDateTime, titleCase } from "@/lib/format";
-import type { Tone } from "@/lib/status-styles";
+import { AI_DRAFT_STATUS_TONE } from "@/lib/status-styles";
 import { approveAndSend, rejectDraft } from "../actions";
-
-const STATUS_TONE: Record<string, Tone> = {
-  pending: "amber",
-  approved: "blue",
-  sent: "emerald",
-  rejected: "red",
-};
 
 export default async function AiInquiryDetailPage({
   params,
@@ -30,14 +23,14 @@ export default async function AiInquiryDetailPage({
   const toolLog = (draft.tool_log as any[]) ?? [];
   const approveWithId = approveAndSend.bind(null, draft.id);
   const rejectWithId = rejectDraft.bind(null, draft.id);
-  const canAct = draft.status === "pending";
+  const canAct = draft.status === "pending" || draft.status === "human_required";
 
   return (
     <div className="max-w-3xl space-y-6">
       <PageHeader
         title={draft.leads?.guest_name ?? draft.contact_address ?? "AI Inquiry"}
-        description={`${titleCase(draft.channel)} · ${draft.contact_address} · received ${formatDateTime(draft.created_at)}`}
-        actions={<StatusBadge status={draft.status} tone={STATUS_TONE[draft.status] ?? "slate"} />}
+        description={`${titleCase(draft.channel)} · ${draft.contact_address} · received ${formatDateTime(draft.created_at)}${draft.intent ? ` · ${titleCase(draft.intent)}` : ""}`}
+        actions={<StatusBadge status={draft.status} tone={AI_DRAFT_STATUS_TONE[draft.status] ?? "slate"} />}
       />
 
       {searchParams.sent === "true" && (
@@ -56,6 +49,21 @@ export default async function AiInquiryDetailPage({
         <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Guest message</p>
         <p className="whitespace-pre-wrap text-sm text-navy-800">{draft.inbound_message}</p>
       </div>
+
+      {draft.ai_action_summary && (
+        <p className="text-xs text-slate-400">{draft.ai_action_summary}</p>
+      )}
+
+      {draft.escalated && (
+        <div className="flex items-start gap-2 rounded-xl bg-danger-50 px-4 py-3 text-sm text-danger-600">
+          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            <span className="font-medium">Pixel AI escalated this — human required.</span>{" "}
+            {draft.escalation_reason ?? "No confident, grounded answer was available."} Take over the conversation below: edit the reply
+            and send it, or add the missing information to the Knowledge Base / Rate Engine first.
+          </span>
+        </div>
+      )}
 
       {draft.needs_more_info && draft.needs_more_info.length > 0 && (
         <div className="rounded-xl bg-warning-50 px-4 py-3 text-sm text-warning-600">

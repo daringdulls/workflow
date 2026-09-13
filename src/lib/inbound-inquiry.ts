@@ -1,5 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { runInquiryAgent } from "@/lib/ai-agent";
+import { sendWhatsAppMessage } from "@/lib/notify/whatsapp";
+import { sendEmail } from "@/lib/notify/email";
 
 export interface InboundInquiry {
   channel: "whatsapp" | "email";
@@ -11,8 +13,9 @@ export interface InboundInquiry {
 /**
  * Shared pipeline for every inbound B2C channel: resolve the organization,
  * match/create the guest and lead, log the inbound message, run the Pixel AI
- * agent, and leave a draft for staff to review — nothing is sent to the guest
- * automatically.
+ * agent, and either auto-reply (Level 3 — pure informational, high
+ * confidence, org opted in) or leave a draft for staff to review (Level 2) or
+ * escalate to a human (no confident, grounded answer available).
  */
 export async function handleInboundInquiry(inquiry: InboundInquiry) {
   const supabase = createServiceClient();
@@ -21,7 +24,7 @@ export async function handleInboundInquiry(inquiry: InboundInquiry) {
     throw new Error("PIXEL_DEFAULT_ORGANIZATION_SLUG is not configured.");
   }
 
-  const { data: org } = await supabase.from("organizations").select("id").eq("slug", orgSlug).maybeSingle();
+  const { data: org } = await supabase.from("organizations").select("id, ai_auto_reply_enabled").eq("slug", orgSlug).maybeSingle();
   if (!org) throw new Error(`Unknown organization slug ${orgSlug}`);
 
   const contactColumn = inquiry.channel === "whatsapp" ? "whatsapp" : "email";
@@ -75,6 +78,14 @@ export async function handleInboundInquiry(inquiry: InboundInquiry) {
     });
   }
 
+  // Prior messages on this thread give the agent conversation continuity.
+  const { data: history } = await supabase
+    .from("communications")
+    .select("direction, message")
+    .eq("lead_id", leadId)
+    .order("occurred_at", { ascending: true })
+    .limit(10);
+
   await supabase.from("communications").insert({
     organization_id: org.id,
     guest_id: guest?.id ?? null,
@@ -92,9 +103,31 @@ export async function handleInboundInquiry(inquiry: InboundInquiry) {
       guestName,
       contactAddress: inquiry.contactAddress,
       message: inquiry.message,
+      priorMessages: history ?? [],
     },
     supabase
   );
+
+  // Level 3: pure informational, high-confidence, not escalated, and the org
+  // has opted in — safe to auto-send. Anything with a quote, or that isn't
+  // fully confident, always waits for a human (Level 2).
+  const canAutoReply =
+    org.ai_auto_reply_enabled &&
+    !agentResult.escalate &&
+    agentResult.suggestedQuotation === null &&
+    agentResult.confidence === "high" &&
+    agentResult.needsMoreInfo.length === 0;
+
+  let sendResult: { sent: boolean; reason?: string } | null = null;
+  if (canAutoReply) {
+    sendResult =
+      inquiry.channel === "whatsapp"
+        ? await sendWhatsAppMessage(inquiry.contactAddress, agentResult.replyDraft)
+        : await sendEmail(inquiry.contactAddress, "Re: your inquiry", agentResult.replyDraft);
+  }
+
+  const autoSent = Boolean(sendResult?.sent);
+  const status = agentResult.escalate ? "human_required" : autoSent ? "sent" : "pending";
 
   const { data: draft, error: draftError } = await supabase
     .from("ai_drafts")
@@ -111,25 +144,52 @@ export async function handleInboundInquiry(inquiry: InboundInquiry) {
       confidence: agentResult.confidence,
       tool_log: agentResult.toolLog,
       model_used: agentResult.modelUsed,
-      status: "pending",
+      intent: agentResult.intent,
+      escalated: agentResult.escalate,
+      escalation_reason: agentResult.escalationReason,
+      ai_action_summary: agentResult.escalate
+        ? `Escalated — ${agentResult.escalationReason ?? "no confident, grounded answer"}`
+        : autoSent
+          ? "Auto-replied (Level 3 — informational, high confidence)"
+          : agentResult.suggestedQuotation
+            ? "Generated quotation, awaiting approval"
+            : "Drafted reply, awaiting approval",
+      status,
+      sent_at: autoSent ? new Date().toISOString() : null,
     })
     .select("id")
     .single();
   if (draftError) throw new Error(draftError.message);
 
-  const { data: staff } = await supabase.from("profiles").select("id").eq("organization_id", org.id).eq("is_org_admin", true);
-  if (staff && staff.length > 0) {
-    await supabase.from("notifications").insert(
-      staff.map((s) => ({
-        user_id: s.id,
-        organization_id: org.id,
-        type: "inquiry_new" as const,
-        title: "New AI-drafted reply ready for review",
-        message: `${guestName ?? "A guest"} messaged via ${inquiry.channel}. Pixel AI drafted a reply — review before sending.`,
-        link: `/ai-inquiries/${draft.id}`,
-      }))
-    );
+  if (autoSent) {
+    await supabase.from("communications").insert({
+      organization_id: org.id,
+      guest_id: guest?.id ?? null,
+      lead_id: leadId,
+      channel: inquiry.channel,
+      direction: "outbound",
+      message: agentResult.replyDraft,
+    });
   }
 
-  return { leadId, draftId: draft.id };
+  // Notify staff for anything that isn't a fully-automatic Level 3 reply.
+  if (!autoSent) {
+    const { data: staff } = await supabase.from("profiles").select("id").eq("organization_id", org.id).eq("is_org_admin", true);
+    if (staff && staff.length > 0) {
+      await supabase.from("notifications").insert(
+        staff.map((s) => ({
+          user_id: s.id,
+          organization_id: org.id,
+          type: "inquiry_new" as const,
+          title: agentResult.escalate ? "Guest inquiry needs a human" : "New AI-drafted reply ready for review",
+          message: agentResult.escalate
+            ? `${guestName ?? "A guest"} asked something Pixel AI couldn't answer confidently: ${agentResult.escalationReason ?? ""}`
+            : `${guestName ?? "A guest"} messaged via ${inquiry.channel}. Pixel AI drafted a reply — review before sending.`,
+          link: `/ai-inquiries/${draft.id}`,
+        }))
+      );
+    }
+  }
+
+  return { leadId, draftId: draft.id, autoSent };
 }

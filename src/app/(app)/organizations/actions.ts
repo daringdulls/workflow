@@ -18,6 +18,7 @@ export async function updateOrganization(orgId: string, formData: FormData) {
   const updates = {
     name: String(formData.get("name") ?? "").trim(),
     status: String(formData.get("status") ?? "active") as "active" | "inactive",
+    ai_auto_reply_enabled: formData.get("ai_auto_reply_enabled") === "on",
   };
 
   const { error } = await supabase.from("organizations").update(updates).eq("id", orgId);

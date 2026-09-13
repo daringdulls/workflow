@@ -69,6 +69,14 @@ export const EVENT_STATUS_TONE: Record<string, Tone> = {
   failed: "red",
 };
 
+export const AI_DRAFT_STATUS_TONE: Record<string, Tone> = {
+  pending: "amber",
+  human_required: "red",
+  approved: "blue",
+  sent: "emerald",
+  rejected: "slate",
+};
+
 export const SYNC_STATUS_TONE: Record<string, Tone> = {
   pending: "slate",
   syncing: "blue",

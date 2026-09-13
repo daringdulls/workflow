@@ -76,6 +76,7 @@ export async function approveAndSend(draftId: string, formData: FormData) {
       reviewed_by: user.id,
       reviewed_at: new Date().toISOString(),
       sent_at: sendResult.sent ? new Date().toISOString() : null,
+      ai_action_summary: `Approved by ${user.email}${sendResult.sent ? " · sent" : " · not auto-sent, send manually"}`,
     })
     .eq("id", draftId);
 
@@ -112,7 +113,12 @@ export async function rejectDraft(draftId: string) {
 
   await supabase
     .from("ai_drafts")
-    .update({ status: "rejected", reviewed_by: user.id, reviewed_at: new Date().toISOString() })
+    .update({
+      status: "rejected",
+      reviewed_by: user.id,
+      reviewed_at: new Date().toISOString(),
+      ai_action_summary: `Rejected by ${user.email}`,
+    })
     .eq("id", draftId);
 
   revalidatePath("/ai-inquiries");

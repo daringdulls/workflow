@@ -53,6 +53,25 @@ export default async function OrganizationDetailPage({ params }: { params: { id:
             <option value="inactive">Inactive</option>
           </select>
         </div>
+        <div className="rounded-xl border border-slate-100 bg-surface-alt/40 p-4">
+          <label className="flex items-start gap-2.5 text-sm text-navy-700">
+            <input
+              type="checkbox"
+              name="ai_auto_reply_enabled"
+              defaultChecked={org.ai_auto_reply_enabled}
+              disabled={!canEdit}
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600"
+            />
+            <span>
+              <span className="font-medium text-navy-900">Let Pixel AI auto-send Level 3 replies</span>
+              <br />
+              <span className="text-xs text-slate-500">
+                Only pure informational answers (no pricing, no quote, high confidence, nothing escalated) are ever auto-sent — hotel
+                info, dive requirements, restaurant timings, policies. Anything involving a quote always waits for staff approval.
+              </span>
+            </span>
+          </label>
+        </div>
         {canEdit && (
           <button type="submit" className="btn-primary">
             Save changes

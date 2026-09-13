@@ -24,6 +24,7 @@ import {
   Bell,
   FolderOpen,
   Sparkles,
+  BookOpen,
 } from "lucide-react";
 
 export interface NavItem {
@@ -68,7 +69,8 @@ export const NAV_SECTIONS: NavSection[] = [
     title: "CRM & Sales",
     items: [
       { label: "Leads & Inquiries", href: "/leads", icon: UserPlus },
-      { label: "AI Inquiries", href: "/ai-inquiries", icon: Sparkles },
+      { label: "AI Inbox", href: "/ai-inquiries", icon: Sparkles },
+      { label: "Knowledge Base", href: "/knowledge-base", icon: BookOpen },
       { label: "Quotations", href: "/quotations", icon: FileText },
       { label: "Communications", href: "/communications", icon: MessageSquare },
     ],

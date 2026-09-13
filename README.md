@@ -7,8 +7,23 @@ and distributes the relevant slice of that data to every other Pixel application
 PMS, Restaurant, Reputation, Diving, POS, B2B, Sales/B2C, and more as they come online.
 
 ```
-Pixel Booking Manager → Pixel Core → Pixel PMS / Restaurant / Reputation / Diving / POS / B2B / Sales
+Customer Channels (WhatsApp / Website / Instagram / Facebook / Email / B2B Portal)
+                              ↓
+                       Pixel AI Agent
+      (Intent Detection · Knowledge Base · Conversation Context ·
+                 Tool Calling · Approval Rules)
+                              ↓
+                        Pixel Core
+                              ↓
+   Booking Manager · Rate Engine · Availability · Offers · CRM ·
+        PMS · B2B · Restaurant · Diving · POS · Reputation
 ```
+
+Pixel Booking Manager stays the primary source for booking creation. Pixel AI
+is a second, tool-gated front door for guest-initiated inquiries — it never
+writes directly to the database; every read goes through a named tool, and
+anything beyond a pure informational answer waits for staff approval. See
+**Pixel AI** below.
 
 ## Stack
 
@@ -31,6 +46,7 @@ migrations in `supabase/migrations/` **in order** via the SQL editor (or
 0003_reference_data.sql  permission catalog, system roles, Pixel app registry
 0004_storage.sql      private "pixel-files" storage bucket + policies
 0005_ai_agent.sql      ai_drafts table for the Pixel AI inquiry agent
+0006_knowledge_base_and_extended_rates.sql  Knowledge Base, dive/transfer rates, offers, escalation
 ```
 
 ### 2. Configure environment variables
@@ -89,33 +105,93 @@ Sign in at `http://localhost:3000/login` with the credentials the seed script pr
 
 ## Pixel AI: the B2C inquiry agent
 
-Pixel Core includes a Claude-powered agent that handles inbound WhatsApp and
-email inquiries end to end, up to the point of sending:
+Pixel Core includes a Claude-powered agent (`src/lib/ai-agent.ts`,
+`claude-opus-5`) that reads inbound WhatsApp/email inquiries and drafts a
+reply — and, when it has enough grounded information, a quotation. It never
+has direct database access: every fact it can use comes from a named,
+narrowly-scoped tool, so it can propose but never fabricate.
+
+**AI decides what to ask. Pixel Core decides what is true.**
+
+### Flow
 
 1. A guest message arrives at `/api/v1/webhooks/whatsapp` (Meta Cloud API) or
    `/api/v1/webhooks/email` (generic inbound-email webhook).
-2. Pixel Core matches or creates the guest and a lead, and logs the inbound
-   message as a communication.
-3. The agent (`src/lib/ai-agent.ts`, `claude-opus-5`) calls tools that read
-   your **live** data — `list_properties`, `list_room_types`,
-   `check_availability`, `get_rates` — and drafts a reply plus an optional
-   quotation. It never invents a price or availability claim; if it can't
-   ground an answer in a tool result, it asks a clarifying question instead.
-4. The draft lands in **AI Inquiries** in the sidebar as `pending` — nothing
-   is ever sent automatically. A staff member reviews the reply (editable),
-   the suggested quote (editable, optional), approves, and only then does it
-   go out — via the WhatsApp Cloud API / Resend if those env vars are
-   configured, otherwise it's marked approved with the text ready to copy and
-   send manually.
+2. Pixel Core matches or creates the guest and a lead, logs the inbound
+   message, and pulls the last 10 messages on that thread for context.
+3. The agent identifies intent (dates, guests, property, room, diving,
+   transfers, meal plan) and calls tools — `check_availability`,
+   `get_room_rates`, `get_dive_rates`, `get_transfer_rates`,
+   `get_active_offers`, `search_knowledge_base`, `get_guest`,
+   `get_booking_status` — to ground every claim. It computes quote totals
+   itself from the unit prices those tools return (nights × rate, dives ×
+   per-person price, offer discount applied) — it never asks the model to
+   recall a price from memory.
+4. If nothing grounds a confident answer, the agent sets `escalate: true`
+   instead of guessing — the draft lands as **Human Required**, not sent.
+5. Otherwise the draft lands in the **AI Inbox** (sidebar → CRM & Sales → AI
+   Inbox) for review, unless it qualifies for Level 3 auto-reply (below).
 
-To go live: set `ANTHROPIC_API_KEY` and `PIXEL_DEFAULT_ORGANIZATION_SLUG`,
-subscribe a WhatsApp Cloud API webhook to `/api/v1/webhooks/whatsapp` (verify
-with `WHATSAPP_VERIFY_TOKEN`, sign with `WHATSAPP_APP_SECRET`), and/or point
-your email provider's inbound webhook at
+### Authority levels
+
+| Level | What | Enforcement |
+|---|---|---|
+| **1 — Answer only** | Read-only tool calls (availability, rates, knowledge base, booking status) | The agent has no tool that writes anything |
+| **2 — Prepare actions** | Any reply that includes a quotation | Always lands as `pending` in the AI Inbox — never auto-sent, regardless of confidence |
+| **3 — Automatic low-risk** | Pure informational replies (hotel info, policies, dive requirements — no quote) | Auto-sent **only** when `confidence: high`, not escalated, no quote, and the organization has opted in (Organizations → toggle "Let Pixel AI auto-send Level 3 replies") |
+| **4 — Sensitive, human-only** | Discounts, rate overrides, booking confirmation/cancellation, refunds, date changes | The agent has **no tools** for any of these — they only happen through the normal Quotations/Reservations UI, by a person |
+
+### Knowledge Base
+
+Non-transactional questions ("do you provide towels for diving?") are
+answered only from **Knowledge Base** articles (sidebar → CRM & Sales →
+Knowledge Base) — categorized per property (check-in/out, meal times,
+facilities, dive requirements, cancellation/payment/children policy,
+restaurant menu, island info, FAQs, …). Every answer the agent gives from it
+carries a source citation (`Property → Category → Article title`), shown in
+the "What Pixel AI checked" panel on each AI Inbox draft. No matching
+article → the agent escalates instead of guessing.
+
+### Rate Engine
+
+Room rates, dive rates, transfer rates and offers are four separate,
+narrowly-scoped tools/tables (`rate_plans`, `dive_rates`, `transfer_rates`,
+`offers`) rather than one catch-all — set them up under **Rate Engine**
+(tabs for each). Offers support a minimum-nights trigger and a discount
+type/value the agent applies arithmetically, never by inventing a number.
+
+### AI Inbox status buckets
+
+`ai_drafts.status`: `pending` (waiting on staff — this covers "New" and
+"AI Handling" too, since in this request/response architecture the agent has
+already run by the time a row exists to show), `human_required` (escalated),
+`approved` (sent by staff but auto-send wasn't configured — copy and send
+manually), `sent` (delivered, waiting on the guest), `rejected`. "Converted"
+is derived, not a stored status — it's any draft whose linked quotation was
+converted to a booking.
+
+### Setup
+
+Set `ANTHROPIC_API_KEY` and `PIXEL_DEFAULT_ORGANIZATION_SLUG`, subscribe a
+WhatsApp Cloud API webhook to `/api/v1/webhooks/whatsapp` (verify with
+`WHATSAPP_VERIFY_TOKEN`, sign with `WHATSAPP_APP_SECRET`), and/or point your
+email provider's inbound webhook at
 `/api/v1/webhooks/email?secret=EMAIL_INBOUND_SECRET`. Outbound sending is
 optional — add `WHATSAPP_ACCESS_TOKEN`/`WHATSAPP_PHONE_NUMBER_ID` and/or
 `RESEND_API_KEY`/`EMAIL_FROM_ADDRESS` whenever you're ready for the app to
-send approved replies itself.
+send approved (and Level 3 auto-) replies itself; without them, approved
+drafts are marked ready with the text there to copy and send by hand.
+
+### Deferred (not built yet)
+
+B2B-specific AI pricing (checks the logged-in agent's contracted rate) needs
+the B2B portal first. Module-specific agents — "who's arriving tomorrow"
+(PMS), "who needs dive equipment tomorrow" (Diving), "half-board dinners
+tonight" (Restaurant), "negative reviews this month" (Reputation) — reuse the
+same `runInquiryAgent` tool-calling pattern once those apps' data models
+exist; they're a new system prompt + tool set, not new infrastructure.
+Scheduled follow-ups ("no response in 24h, check in again") need a cron
+trigger (e.g. Vercel Cron) that isn't wired up yet.
 
 ## Data ownership
 

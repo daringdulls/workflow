@@ -44,13 +44,21 @@ export type TransactionStatus = "pending" | "completed" | "voided" | "refunded";
 export type ReviewPlatform = "google" | "tripadvisor" | "booking_com" | "expedia" | "facebook" | "other";
 export type ReviewSentiment = "positive" | "neutral" | "negative";
 export type ReviewResponseStatus = "pending" | "responded" | "not_required";
-export type AiDraftStatus = "pending" | "approved" | "rejected" | "sent";
+export type AiDraftStatus = "pending" | "approved" | "rejected" | "sent" | "human_required";
+export type KnowledgeCategory =
+  | "check_in_out" | "meal_times" | "airport_transfer" | "room_info" | "facilities"
+  | "diving" | "dive_requirements" | "cancellation_policy" | "payment_policy"
+  | "children_policy" | "extra_bed_policy" | "restaurant_menu" | "activities"
+  | "bike_rental" | "island_info" | "emergency_info" | "faq" | "other";
+export type OfferDiscountType = "percentage" | "fixed_amount";
+export type TransferDirection = "one_way" | "return";
 
 export interface Organization {
   id: string;
   name: string;
   slug: string;
   status: PropertyStatus;
+  ai_auto_reply_enabled: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -510,7 +518,76 @@ export interface AiDraft {
   reviewed_by: string | null;
   reviewed_at: string | null;
   sent_at: string | null;
+  intent: string | null;
+  escalated: boolean;
+  escalation_reason: string | null;
+  ai_action_summary: string | null;
   created_at: string;
+}
+
+export interface KnowledgeBaseArticle {
+  id: string;
+  organization_id: string;
+  property_id: string | null;
+  category: KnowledgeCategory;
+  title: string;
+  content: string;
+  status: PropertyStatus;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
+}
+
+export interface DiveRate {
+  id: string;
+  organization_id: string;
+  property_id: string;
+  package_name: string;
+  dives_included: number;
+  price_per_person: number;
+  currency: string;
+  min_participants: number;
+  start_date: string;
+  end_date: string;
+  status: RateStatus;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TransferRate {
+  id: string;
+  organization_id: string;
+  property_id: string;
+  transfer_type: string;
+  direction: TransferDirection;
+  price_per_person: number;
+  currency: string;
+  start_date: string;
+  end_date: string;
+  status: RateStatus;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Offer {
+  id: string;
+  organization_id: string;
+  property_id: string | null;
+  name: string;
+  description: string | null;
+  promo_code: string | null;
+  discount_type: OfferDiscountType;
+  discount_value: number;
+  trigger_min_nights: number | null;
+  applies_to: string[];
+  start_date: string;
+  end_date: string;
+  status: RateStatus;
+  created_at: string;
+  updated_at: string;
 }
 
 type Table<Row> = { Row: Row; Insert: Partial<Row>; Update: Partial<Row>; Relationships: [] };
@@ -545,6 +622,10 @@ export interface Database {
       pos_transactions: Table<PosTransaction>;
       reviews: Table<Review>;
       ai_drafts: Table<AiDraft>;
+      knowledge_base_articles: Table<KnowledgeBaseArticle>;
+      dive_rates: Table<DiveRate>;
+      transfer_rates: Table<TransferRate>;
+      offers: Table<Offer>;
     };
     Views: {};
     Functions: {

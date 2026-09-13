@@ -2,12 +2,14 @@ import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import type { createServiceClient } from "@/lib/supabase/server";
 import type { SuggestedQuotation } from "@/lib/database.types";
+import { sourceLabel } from "@/lib/knowledge";
 
 type ServiceClient = ReturnType<typeof createServiceClient>;
 
 const MODEL = "claude-opus-5";
 
 const FinalAnswerSchema = z.object({
+  intent: z.string(),
   guest_reply: z.string(),
   quote: z
     .object({
@@ -23,6 +25,8 @@ const FinalAnswerSchema = z.object({
     .nullable(),
   needs_more_info: z.array(z.string()),
   confidence: z.enum(["high", "medium", "low"]),
+  escalate: z.boolean(),
+  escalation_reason: z.string().nullable(),
 });
 
 export interface AgentToolLogEntry {
@@ -37,37 +41,85 @@ export interface AgentInput {
   guestName: string | null;
   contactAddress: string;
   message: string;
+  /** Prior messages on this thread, oldest first — gives the agent conversation continuity. */
+  priorMessages?: { direction: "inbound" | "outbound" | "internal"; message: string }[];
 }
 
 export interface AgentResult {
+  intent: string;
   replyDraft: string;
   suggestedQuotation: SuggestedQuotation | null;
   needsMoreInfo: string[];
   confidence: string;
+  escalate: boolean;
+  escalationReason: string | null;
   toolLog: AgentToolLogEntry[];
   modelUsed: string;
 }
 
+// ── Authority levels ────────────────────────────────────────────────────────
+// Level 1  Answer only — read tools, no pricing, no side effects.
+// Level 2  Prepare actions — quotation math is computed, but a human always
+//          approves before anything is sent (never auto-sent, regardless of
+//          confidence).
+// Level 3  Automatic low-risk replies — pure informational answers (no quote)
+//          may be auto-sent when the org has enabled it AND confidence is high
+//          AND the agent did not escalate. Enforced by the caller
+//          (handleInboundInquiry), not by this module.
+// Level 4  Sensitive actions (discounts, rate overrides, booking confirmation/
+//          cancellation, refunds, date changes) — this agent has NO tools that
+//          can perform these. They stay human-only, done through the normal
+//          Quotations/Reservations UI.
+
 const SYSTEM_PROMPT = `You are the Pixel AI reservations assistant for a hospitality group on Pixel Core. \
-A guest inquiry has come in over WhatsApp or email. Your job is to draft a warm, professional, \
-accurate reply that a staff member will review before it is sent — you never send anything yourself.
+A guest inquiry has come in over WhatsApp or email, possibly as part of an ongoing conversation. \
+Draft a warm, professional, accurate reply that a staff member will review before it is sent — you \
+never send anything yourself and you never confirm a booking.
 
-Ground every fact in tool results. Never invent availability, prices, room types, or property names. \
-Always call check_availability and get_rates before including any price or availability claim. \
-If a property or room type isn't clear from the message, call list_properties / list_room_types first.
+AI decides what to ask. Pixel Core decides what is true. Ground every fact — availability, prices, \
+taxes, offers, transfer prices, room inventory, booking status, hotel/dive/restaurant information, \
+policies — in a tool result. Never invent or estimate any of these. If tools return no data for what \
+you need, say so in the reply and set escalate accordingly rather than guessing.
 
-If you don't have enough information to check availability or pricing (missing dates, property, or \
-guest count), do not guess — ask a clarifying question in guest_reply and list what's missing in \
-needs_more_info instead of fabricating a quote.
+When a guest asks about accommodation, diving, transfers or a package:
+1. Identify what they're asking for: dates, number of guests, property, room needs, diving (and how many \
+dives), transfers, meal plan. If a property isn't named, use list_properties to find it (e.g. from an \
+island or area name) or ask which property they mean.
+2. Call check_availability for the relevant property/room type/dates before claiming anything is available.
+3. Call get_room_rates for accommodation pricing. Call get_dive_rates when diving is mentioned. Call \
+get_transfer_rates when transfers/flights are mentioned. Call get_active_offers and apply any offer whose \
+trigger is met (e.g. a minimum-nights offer) — do the discount arithmetic yourself from the returned \
+discount_type/discount_value, never invent a percentage.
+4. Build the total quote strictly from the numbers tools returned (nights × room rate, dives × per-person \
+dive price × number of guests, transfers × per-person price × guests, minus any applicable offer). Show \
+this breakdown in the reply so it's easy for staff to verify.
 
-Keep guest_reply concise, friendly, and ready to send with only minor edits. Do not promise a \
-confirmed booking — a quote is not a reservation until staff follow up.
+For non-transactional questions (hotel facilities, check-in time, dive requirements, cancellation policy, \
+restaurant info, island information, FAQs), call search_knowledge_base. Only answer from what it returns, \
+and mention you're happy to send more detail — never fabricate policy details. If search_knowledge_base \
+returns nothing relevant, do not guess: set escalate to true instead ("I'll check this with our \
+reservations team." style reply) with a clear escalation_reason.
 
-End your final turn with exactly one fenced json code block matching this shape (quote is null when \
-you don't have enough grounded information for one):
+Use get_guest for returning-guest context (VIP status, past stays) and get_booking_status when a guest \
+asks about an existing booking. Do not attempt to modify a booking, apply a discount, override a rate, or \
+confirm/cancel anything — those require staff action outside this conversation; if asked, say a team \
+member will help and set escalate to true.
+
+If you don't have enough information to check availability or pricing (missing dates, property, or guest \
+count), don't guess — ask a clarifying question in guest_reply and list what's missing in needs_more_info.
+
+Set intent to a short label such as "quotation_request", "availability_check", "faq", "booking_status", \
+"escalation", or "other".
+
+Keep guest_reply concise, friendly, and ready to send with only minor edits. A quote is not a confirmed \
+booking until staff follow up.
+
+End your final turn with exactly one fenced json code block matching this shape (quote is null unless you \
+have a fully tool-grounded price; escalation_reason is null unless escalate is true):
 
 \`\`\`json
 {
+  "intent": "string",
   "guest_reply": "string",
   "quote": {
     "property_code": "string",
@@ -77,10 +129,12 @@ you don't have enough grounded information for one):
     "meal_plan": "string or null",
     "currency": "string",
     "accommodation_amount": 0,
-    "notes": "string or null"
+    "notes": "string or null — include the full breakdown (accommodation, diving, transfers, offer applied) here"
   } | null,
   "needs_more_info": ["string"],
-  "confidence": "high" | "medium" | "low"
+  "confidence": "high" | "medium" | "low",
+  "escalate": true | false,
+  "escalation_reason": "string or null"
 }
 \`\`\``;
 
@@ -105,7 +159,7 @@ function tools(): Anthropic.Tool[] {
       name: "check_availability",
       description:
         "Check room availability for a property (optionally a specific room type) over a date range. " +
-        "Returns per-room-type available room counts for each night.",
+        "Returns per-room-type available room counts.",
       input_schema: {
         type: "object",
         properties: {
@@ -119,10 +173,8 @@ function tools(): Anthropic.Tool[] {
       },
     },
     {
-      name: "get_rates",
-      description:
-        "Get active public rates and promotions for a property (optionally a specific room type) " +
-        "covering a date range, including meal plan, currency, amount and cancellation policy.",
+      name: "get_room_rates",
+      description: "Get active public room rates and promotions for a property covering a date range, including meal plan, currency, amount and cancellation policy.",
       input_schema: {
         type: "object",
         properties: {
@@ -135,15 +187,76 @@ function tools(): Anthropic.Tool[] {
         additionalProperties: false,
       },
     },
+    {
+      name: "get_dive_rates",
+      description: "Get active dive packages for a property: dives included, price per person, minimum participants.",
+      input_schema: {
+        type: "object",
+        properties: { property_code: { type: "string" }, date: { type: "string", description: "YYYY-MM-DD, any date in the stay" } },
+        required: ["property_code"],
+        additionalProperties: false,
+      },
+    },
+    {
+      name: "get_transfer_rates",
+      description: "Get active transfer rates for a property (domestic flights, speedboats, seaplanes), price per person by direction.",
+      input_schema: {
+        type: "object",
+        properties: { property_code: { type: "string" }, date: { type: "string", description: "YYYY-MM-DD, any date in the stay" } },
+        required: ["property_code"],
+        additionalProperties: false,
+      },
+    },
+    {
+      name: "get_active_offers",
+      description: "Get active offers/promotions for a property (or org-wide) — discount type, value, and any minimum-nights trigger.",
+      input_schema: {
+        type: "object",
+        properties: { property_code: { type: "string" }, date: { type: "string", description: "YYYY-MM-DD, any date in the stay" } },
+        required: ["property_code"],
+        additionalProperties: false,
+      },
+    },
+    {
+      name: "search_knowledge_base",
+      description:
+        "Search approved property information — check-in/out times, meal times, facilities, diving info, dive requirements, " +
+        "cancellation/payment/children/extra-bed policy, restaurant menu, activities, bike rental, island info, emergency info, FAQs. " +
+        "Use this for any non-transactional question. Returns matching articles with their content and source.",
+      input_schema: {
+        type: "object",
+        properties: {
+          property_code: { type: "string", description: "Optional. Omit to search org-wide content too." },
+          query: { type: "string", description: "Keywords from the guest's question." },
+        },
+        required: ["query"],
+        additionalProperties: false,
+      },
+    },
+    {
+      name: "get_guest",
+      description: "Look up an existing guest by phone or email for context (VIP status, past stays, preferences).",
+      input_schema: {
+        type: "object",
+        properties: { contact_address: { type: "string", description: "Phone number or email address." } },
+        required: ["contact_address"],
+        additionalProperties: false,
+      },
+    },
+    {
+      name: "get_booking_status",
+      description: "Look up an existing reservation's status by booking number.",
+      input_schema: {
+        type: "object",
+        properties: { booking_number: { type: "string" } },
+        required: ["booking_number"],
+        additionalProperties: false,
+      },
+    },
   ];
 }
 
-async function executeTool(
-  supabase: ServiceClient,
-  organizationId: string,
-  name: string,
-  input: any
-): Promise<unknown> {
+async function executeTool(supabase: ServiceClient, organizationId: string, name: string, input: any): Promise<unknown> {
   switch (name) {
     case "list_properties": {
       const { data } = await supabase
@@ -155,12 +268,7 @@ async function executeTool(
       return data ?? [];
     }
     case "list_room_types": {
-      const { data: property } = await supabase
-        .from("properties")
-        .select("id")
-        .eq("organization_id", organizationId)
-        .eq("code", input.property_code)
-        .maybeSingle();
+      const property = await findProperty(supabase, organizationId, input.property_code);
       if (!property) return { error: `Unknown property_code ${input.property_code}` };
       const { data } = await supabase
         .from("room_types")
@@ -171,22 +279,12 @@ async function executeTool(
       return data ?? [];
     }
     case "check_availability": {
-      const { data: property } = await supabase
-        .from("properties")
-        .select("id")
-        .eq("organization_id", organizationId)
-        .eq("code", input.property_code)
-        .maybeSingle();
+      const property = await findProperty(supabase, organizationId, input.property_code);
       if (!property) return { error: `Unknown property_code ${input.property_code}` };
 
       let roomTypeIds: string[] | null = null;
       if (input.room_type_code) {
-        const { data: rt } = await supabase
-          .from("room_types")
-          .select("id")
-          .eq("property_id", property.id)
-          .eq("code", input.room_type_code)
-          .maybeSingle();
+        const rt = await findRoomType(supabase, property.id, input.room_type_code);
         if (!rt) return { error: `Unknown room_type_code ${input.room_type_code}` };
         roomTypeIds = [rt.id];
       }
@@ -201,9 +299,7 @@ async function executeTool(
       const { data } = await query.order("date");
 
       if (!data || data.length === 0) {
-        return {
-          note: "No pre-calculated availability found for this range. Advise the guest that availability will be confirmed, and set confidence to medium or low.",
-        };
+        return { note: "No pre-calculated availability found for this range. Advise the guest that availability will be confirmed, and set confidence to medium or low." };
       }
 
       const byRoomType = new Map<string, { room_type: string; min_available: number; nights_checked: number }>();
@@ -211,32 +307,21 @@ async function executeTool(
         const key = row.room_types?.code ?? row.room_type_id;
         const label = row.room_types?.name ?? key;
         const existing = byRoomType.get(key);
-        if (!existing) {
-          byRoomType.set(key, { room_type: label, min_available: row.available_rooms, nights_checked: 1 });
-        } else {
+        if (!existing) byRoomType.set(key, { room_type: label, min_available: row.available_rooms, nights_checked: 1 });
+        else {
           existing.min_available = Math.min(existing.min_available, row.available_rooms);
           existing.nights_checked += 1;
         }
       }
       return Array.from(byRoomType.values());
     }
-    case "get_rates": {
-      const { data: property } = await supabase
-        .from("properties")
-        .select("id")
-        .eq("organization_id", organizationId)
-        .eq("code", input.property_code)
-        .maybeSingle();
+    case "get_room_rates": {
+      const property = await findProperty(supabase, organizationId, input.property_code);
       if (!property) return { error: `Unknown property_code ${input.property_code}` };
 
       let roomTypeId: string | null = null;
       if (input.room_type_code) {
-        const { data: rt } = await supabase
-          .from("room_types")
-          .select("id")
-          .eq("property_id", property.id)
-          .eq("code", input.room_type_code)
-          .maybeSingle();
+        const rt = await findRoomType(supabase, property.id, input.room_type_code);
         if (!rt) return { error: `Unknown room_type_code ${input.room_type_code}` };
         roomTypeId = rt.id;
       }
@@ -268,17 +353,109 @@ async function executeTool(
         cancellation_policy: r.cancellation_policy,
       }));
     }
+    case "get_dive_rates": {
+      const property = await findProperty(supabase, organizationId, input.property_code);
+      if (!property) return { error: `Unknown property_code ${input.property_code}` };
+      const date = input.date ?? new Date().toISOString().slice(0, 10);
+      const { data } = await supabase
+        .from("dive_rates")
+        .select("package_name, dives_included, price_per_person, currency, min_participants, notes")
+        .eq("property_id", property.id)
+        .eq("status", "active")
+        .lte("start_date", date)
+        .gte("end_date", date);
+      if (!data || data.length === 0) return { note: "No active dive rate found. Do not invent a diving price — ask a clarifying question or escalate." };
+      return data;
+    }
+    case "get_transfer_rates": {
+      const property = await findProperty(supabase, organizationId, input.property_code);
+      if (!property) return { error: `Unknown property_code ${input.property_code}` };
+      const date = input.date ?? new Date().toISOString().slice(0, 10);
+      const { data } = await supabase
+        .from("transfer_rates")
+        .select("transfer_type, direction, price_per_person, currency, notes")
+        .eq("property_id", property.id)
+        .eq("status", "active")
+        .lte("start_date", date)
+        .gte("end_date", date);
+      if (!data || data.length === 0) return { note: "No active transfer rate found. Do not invent a transfer price — ask a clarifying question or escalate." };
+      return data;
+    }
+    case "get_active_offers": {
+      const property = await findProperty(supabase, organizationId, input.property_code);
+      if (!property) return { error: `Unknown property_code ${input.property_code}` };
+      const date = input.date ?? new Date().toISOString().slice(0, 10);
+      const { data } = await supabase
+        .from("offers")
+        .select("name, description, promo_code, discount_type, discount_value, trigger_min_nights, applies_to")
+        .or(`property_id.eq.${property.id},property_id.is.null`)
+        .eq("organization_id", organizationId)
+        .eq("status", "active")
+        .lte("start_date", date)
+        .gte("end_date", date);
+      return data ?? [];
+    }
+    case "search_knowledge_base": {
+      let propertyId: string | null = null;
+      if (input.property_code) {
+        const property = await findProperty(supabase, organizationId, input.property_code);
+        propertyId = property?.id ?? null;
+      }
+      const like = `%${input.query}%`;
+      let query = supabase
+        .from("knowledge_base_articles")
+        .select("category, title, content, property_id, properties(name)")
+        .eq("organization_id", organizationId)
+        .eq("status", "active")
+        .or(`title.ilike.${like},content.ilike.${like}`)
+        .limit(5);
+      if (propertyId) query = query.or(`property_id.eq.${propertyId},property_id.is.null`);
+      const { data } = await query;
+      if (!data || data.length === 0) return { note: "No matching knowledge base article. Do not guess the answer — escalate instead." };
+      return (data as any[]).map((a) => ({
+        title: a.title,
+        content: a.content,
+        source: sourceLabel(a.properties?.name ?? null, a.category, a.title),
+      }));
+    }
+    case "get_guest": {
+      const { data } = await supabase
+        .from("guests")
+        .select("guest_number, first_name, last_name, vip_status, nationality, dietary_requirements, special_requirements")
+        .eq("organization_id", organizationId)
+        .or(`email.eq.${input.contact_address},phone.eq.${input.contact_address},whatsapp.eq.${input.contact_address}`)
+        .maybeSingle();
+      return data ?? { note: "No existing guest profile found." };
+    }
+    case "get_booking_status": {
+      const { data } = await supabase
+        .from("reservations")
+        .select("booking_number, arrival_date, departure_date, booking_status, payment_status, outstanding_amount, currency")
+        .eq("organization_id", organizationId)
+        .eq("booking_number", input.booking_number)
+        .maybeSingle();
+      return data ?? { note: "No booking found with that number." };
+    }
     default:
       return { error: `Unknown tool ${name}` };
   }
+}
+
+async function findProperty(supabase: ServiceClient, organizationId: string, code: string) {
+  const { data } = await supabase.from("properties").select("id").eq("organization_id", organizationId).eq("code", code).maybeSingle();
+  return data;
+}
+
+async function findRoomType(supabase: ServiceClient, propertyId: string, code: string) {
+  const { data } = await supabase.from("room_types").select("id").eq("property_id", propertyId).eq("code", code).maybeSingle();
+  return data;
 }
 
 function extractFinalAnswer(text: string): z.infer<typeof FinalAnswerSchema> | null {
   const match = text.match(/```json\s*([\s\S]*?)```/);
   if (!match) return null;
   try {
-    const parsed = JSON.parse(match[1]);
-    return FinalAnswerSchema.parse(parsed);
+    return FinalAnswerSchema.parse(JSON.parse(match[1]));
   } catch {
     return null;
   }
@@ -288,15 +465,21 @@ export async function runInquiryAgent(input: AgentInput, supabase: ServiceClient
   const client = new Anthropic();
   const toolLog: AgentToolLogEntry[] = [];
 
+  const historyText = (input.priorMessages ?? [])
+    .map((m) => `[${m.direction}] ${m.message}`)
+    .join("\n");
+
   const messages: Anthropic.MessageParam[] = [
     {
       role: "user",
-      content: `Channel: ${input.channel}\nGuest name: ${input.guestName ?? "unknown"}\nContact: ${input.contactAddress}\n\nMessage:\n${input.message}`,
+      content:
+        (historyText ? `Prior conversation on this thread:\n${historyText}\n\n` : "") +
+        `Channel: ${input.channel}\nGuest name: ${input.guestName ?? "unknown"}\nContact: ${input.contactAddress}\n\nLatest message:\n${input.message}`,
     },
   ];
 
   let finalText = "";
-  for (let iteration = 0; iteration < 6; iteration++) {
+  for (let iteration = 0; iteration < 8; iteration++) {
     const response = await client.messages.create({
       model: MODEL,
       max_tokens: 4096,
@@ -325,20 +508,26 @@ export async function runInquiryAgent(input: AgentInput, supabase: ServiceClient
   const parsed = extractFinalAnswer(finalText);
   if (parsed) {
     return {
+      intent: parsed.intent,
       replyDraft: parsed.guest_reply,
       suggestedQuotation: parsed.quote,
       needsMoreInfo: parsed.needs_more_info,
       confidence: parsed.confidence,
+      escalate: parsed.escalate,
+      escalationReason: parsed.escalation_reason,
       toolLog,
       modelUsed: MODEL,
     };
   }
 
   return {
+    intent: "other",
     replyDraft: finalText || "The assistant could not generate a reply. Please respond to this guest manually.",
     suggestedQuotation: null,
     needsMoreInfo: ["Agent response could not be parsed — please review and draft a reply manually."],
     confidence: "low",
+    escalate: true,
+    escalationReason: "Agent output did not match the expected format.",
     toolLog,
     modelUsed: MODEL,
   };
