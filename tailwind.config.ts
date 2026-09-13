@@ -10,47 +10,66 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Inter", "Aptos", "system-ui", "-apple-system", "Segoe UI", "sans-serif"],
+        sans: ["Inter", "system-ui", "-apple-system", "Segoe UI", "sans-serif"],
       },
       colors: {
-        hotel: {
-          50: "#eef5fd",
+        brand: {
+          50: "#eff6ff",
           100: "#dbeafe",
-          400: "#5598e7",
-          DEFAULT: "#2a78d6",
-          600: "#256abf",
-          700: "#184f95",
-          900: "#0d366b",
+          200: "#bfdbfe",
+          300: "#93c5fd",
+          400: "#60a5fa",
+          500: "#3b82f6",
+          600: "#2563eb",
+          700: "#1d4ed8",
+          800: "#1e40af",
+          900: "#1e3a8a",
+          DEFAULT: "#2563eb",
         },
-        design: {
-          50: "#f4f6ff",
-          100: "#e8ecff",
-          200: "#d5dcff",
-          400: "#8192df",
-          DEFAULT: "#6476cc",
-          600: "#5868b8",
-          700: "#465494",
-          900: "#293259",
+        navy: {
+          50: "#f8fafc",
+          100: "#eef2f7",
+          400: "#334155",
+          700: "#1e293b",
+          800: "#152238",
+          900: "#0f172a",
+          950: "#0a1120",
+          DEFAULT: "#0f172a",
         },
-        freelance: {
-          50: "#e8f9f2",
-          100: "#c7f0df",
-          400: "#3fca97",
-          DEFAULT: "#1baf7a",
-          600: "#169e6b",
-          700: "#0f7d54",
-          900: "#0a5238",
+        surface: "#F8FAFC",
+        "surface-alt": "#EFF6FF",
+        success: {
+          DEFAULT: "#10b981",
+          50: "#ecfdf5",
+          600: "#059669",
         },
-        status: {
-          good: "#0ca30c",
-          warning: "#d97a06",
-          serious: "#ec835a",
-          critical: "#d03b3b",
+        warning: {
+          DEFAULT: "#f59e0b",
+          50: "#fffbeb",
+          600: "#d97706",
+        },
+        danger: {
+          DEFAULT: "#ef4444",
+          50: "#fef2f2",
+          600: "#dc2626",
         },
       },
       boxShadow: {
-        card: "0 1px 2px rgba(51, 65, 85, 0.025), 0 10px 30px rgba(90, 104, 145, 0.045)",
-        "card-hover": "0 18px 40px -14px rgba(92, 110, 174, 0.18), 0 4px 12px rgba(51, 65, 85, 0.05)",
+        card: "0 1px 2px rgba(15, 23, 42, 0.03), 0 8px 24px rgba(15, 23, 42, 0.06)",
+        "card-hover": "0 16px 36px -12px rgba(37, 99, 235, 0.18), 0 4px 12px rgba(15, 23, 42, 0.06)",
+      },
+      borderRadius: {
+        xl: "0.875rem",
+        "2xl": "1.25rem",
+      },
+      keyframes: {
+        "fade-in": {
+          "0%": { opacity: "0", transform: "translateY(4px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+      },
+      animation: {
+        "fade-in": "fade-in 0.2s ease-out",
       },
     },
   },

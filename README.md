@@ -1,83 +1,120 @@
-# WorkFlow — Pixelate MV
+# Pixel Core
 
-One dashboard for all three of your jobs: Hotel Operations / Revenue / F&B, Graphic Design for the sublimation printing company, and freelance work. Switch profiles at the top; each profile gets its own app launcher, task list, and calendar, plus a combined "All Work" view for the day. It's a real web app (Next.js + Postgres) so it works the same from your phone or laptop and everything saves automatically.
+Pixel Core is the central integration hub for the Pixel hospitality ecosystem. It
+receives booking data from **Pixel Booking Manager** (the primary booking source),
+stores the shared master data (guests, reservations, rooms, rates, availability),
+and distributes the relevant slice of that data to every other Pixel application —
+PMS, Restaurant, Reputation, Diving, POS, B2B, Sales/B2C, and more as they come online.
 
-## What's inside
-
-- **All Work** — a combined task list and calendar across everything, for daily planning.
-- **Hotel Ops** — quick-launch tiles for your Booking app, F&B app, PMS, POS, Sheets, Email, WhatsApp (edit the links to point at your real apps), plus tasks and a calendar.
-- **Graphic Design** — the same, plus a kanban board (New → In Progress → Review → Delivered) for design requests, each with a client name, priority, and due date.
-- **Freelance** — the same, plus a project tracker (Lead → Active → In Review → Delivered → Paid) with client, deadline, and rate.
-- One shared password gate, since this will be reachable on the internet.
-
-## 1. Put this on GitHub
-
-This folder already has a git repo initialized with one commit, so you don't need `git init`. Create an empty repo on GitHub (github.com → New repository, don't initialize it with a README), then from inside the `workflow-app` folder:
-
-```bash
-cd workflow-app
-git remote add origin https://github.com/<your-username>/workflow.git
-git branch -M main
-git push -u origin main
+```
+Pixel Booking Manager → Pixel Core → Pixel PMS / Restaurant / Reputation / Diving / POS / B2B / Sales
 ```
 
-## 2. Create the database (Neon Postgres via Vercel)
+## Stack
 
-1. Go to [vercel.com](https://vercel.com) and sign in (or sign up) with your GitHub account.
-2. Click **Add New → Project**, pick the `workflow` repo you just pushed, and click **Deploy**. The first deploy will succeed for the build but the app won't work yet — it has no database or password set. That's expected, continue below.
-3. In the project, open the **Storage** tab → **Create Database** → choose **Postgres** (this provisions a free Neon database and links it to your project automatically).
-4. Once created, Vercel automatically adds a `DATABASE_URL` (and a couple of related) environment variable to your project. You don't need to copy/paste anything for this part.
+- **Next.js 14** (App Router) + **TypeScript** + **React**
+- **Tailwind CSS** — soft modern blue / dark navy theme
+- **Supabase** — Postgres, Auth, Storage, Row Level Security
+- Deploys cleanly to **Vercel**; designed for low-cost hosting at V1 scale
 
-## 3. Set your password
+## Getting started
 
-1. In the Vercel project, go to **Settings → Environment Variables**.
-2. Add:
-   - `WORKFLOW_PASSWORD` — the password you'll type to unlock the dashboard. Pick something only you know.
-   - `SESSION_SECRET` — any long random string (e.g. run `openssl rand -hex 32` in a terminal, or just mash the keyboard for 40+ characters).
-3. Go to **Deployments**, open the latest one, and click **Redeploy** so the new environment variables take effect.
+### 1. Create a Supabase project
 
-That's it — open the deployment URL Vercel gives you (something like `workflow-xyz.vercel.app`), enter your password, and you're in. The database tables are created automatically the first time the app talks to them.
+Create a free project at [supabase.com](https://supabase.com), then run the SQL
+migrations in `supabase/migrations/` **in order** via the SQL editor (or
+`supabase db push` if you use the Supabase CLI):
 
-## 4. Put it on your own domain (optional but recommended)
+```
+0001_init.sql        core schema (organizations, properties, guests, reservations, rates, …)
+0002_rls.sql          row level security policies + auth trigger
+0003_reference_data.sql  permission catalog, system roles, Pixel app registry
+0004_storage.sql      private "pixel-files" storage bucket + policies
+```
 
-Since you already own **pixelatemv.com**, it's worth putting this at a subdomain like `workflow.pixelatemv.com` instead of the default vercel.app address:
+### 2. Configure environment variables
 
-1. In the Vercel project, go to **Settings → Domains**, and add `workflow.pixelatemv.com`.
-2. Vercel will show you a CNAME record to add. Go to wherever pixelatemv.com's DNS is managed and add that record (usually: type `CNAME`, name `workflow`, value the target Vercel gives you).
-3. Wait a few minutes for DNS to propagate, then `workflow.pixelatemv.com` will load the dashboard directly.
+```bash
+cp .env.example .env.local
+```
 
-## 5. Using it day to day
+Fill in from your Supabase project's **Settings → API**:
 
-- **Quick Launch** tiles open your real apps in a new tab — click "+ Add app" the first time to point the Hotel Ops tiles at your actual Booking app, F&B app, PMS, and POS URLs (they're placeholders right now). You can add/remove tiles any time.
-- **Tasks** have a priority (Low/Medium/High/Urgent) and an optional due date. Anything with a due date shows up automatically on the Calendar.
-- **Calendar** pulls together task due dates, design order due dates, freelance deadlines, and anything you add directly as a note/meeting for a day — click a day to see everything on it.
-- The **Design Requests** board and **Freelance Projects** tracker are just for those two profiles; drag isn't wired up, but the ← → arrows (design) and the status dropdown (freelance) move things along.
-- Everything is shared across devices in real time because it's backed by a real database — add a task on your phone, see it on your laptop a moment later.
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` (server-only — never expose to the browser)
+- `NEXT_PUBLIC_APP_URL` — e.g. `http://localhost:3000` locally
+- `PIXEL_WEBHOOK_SECRETS` — one secret per connected Pixel app, e.g.
+  `booking_manager:changeme1,pms:changeme2,restaurant:changeme3,reputation:changeme4`
 
-## Local development (optional)
-
-If you want to run this on your own machine before/instead of deploying:
+### 3. Install dependencies and seed your first organization
 
 ```bash
 npm install
-cp .env.example .env.local   # then fill in WORKFLOW_PASSWORD, SESSION_SECRET, and DATABASE_URL
+npm run seed -- --email you@example.com --password "SomeStrongPass123!"
+```
+
+This creates the **Cozy Hotels Maldives** organization, its starter properties, and
+your first Company Admin login. It's safe to re-run. No guest, booking or lead data
+is ever seeded — the app ships with clean, empty states until real data flows in.
+
+### 4. Run it
+
+```bash
 npm run dev
 ```
 
-For `DATABASE_URL` locally, either pull Vercel's: `npx vercel env pull .env.local` (after `npx vercel link`), or point it at any Postgres you have (Neon's free tier works standalone too, at [neon.tech](https://neon.tech)).
+Sign in at `http://localhost:3000/login` with the credentials the seed script printed.
+
+## How the integration layer works
+
+- **Inbound**: connected Pixel apps POST to `/api/v1/webhooks/{booking-manager,pms,restaurant,reputation}`,
+  authenticated with an `x-pixel-secret` header matched against `PIXEL_WEBHOOK_SECRETS`.
+  Reservations from Pixel Booking Manager are upserted by `(source_app, source_record_id)`
+  so re-delivery never creates duplicates — Pixel Core never becomes a second
+  booking-entry system.
+- **Outbound**: every meaningful change writes a row to `events` (see
+  `Integrations → Event Logs`), which is how other Pixel apps eventually pull or
+  get pushed the slice of data relevant to them.
+- **Read API**: `/api/v1/{guests,reservations,properties,rooms,rates,availability,agents,inquiries,quotations,events}`
+  — paginated, authenticated the same way, documented in-app under
+  `Integrations → Webhooks & API`.
+- **Sync Monitor** and **App Connections** in the sidebar show live connection
+  status, last sync time, and failed-record counts per app.
+
+## Data ownership
+
+| Owns | App |
+|---|---|
+| Booking creation, financials, agent, source, dates, guest count | **Pixel Booking Manager** |
+| Room assignment, check-in/out, operational room status | **Pixel PMS** |
+| Restaurant orders | **Pixel Restaurant Order Manager** |
+| Dive operations & dive profile | **Pixel Diving** |
+| Transactions & payment processing | **Pixel POS** |
+| Reviews & responses | **Pixel Reputation Manager** |
+| Master relationships, shared IDs, permissions, events, sync, audit history | **Pixel Core** |
+
+Apps never touch each other's databases directly — everything goes through Pixel
+Core's API and event system.
 
 ## Project structure
 
 ```
-src/app/            Pages and API routes (Next.js App Router)
-src/app/api/        REST endpoints: tasks, links, design-orders, freelance-projects, events
-src/components/      Dashboard UI: ProfileTabs, AppLauncher, TaskList, Calendar, DesignBoard, FreelanceTracker
-src/lib/db.ts        Database connection + auto schema creation (Neon serverless Postgres)
-src/lib/auth.ts       Single-password session logic
-src/middleware.ts     Gates every page/API route behind the password
-schema.sql             Reference copy of the table definitions (created automatically, not needed to run by hand)
+supabase/migrations/     SQL schema, RLS policies, reference data, storage bucket
+scripts/seed.ts           first-run org/property/admin seed (dev & initial setup)
+src/app/(app)/             the authenticated app shell + every module page
+src/app/login/             sign-in
+src/app/api/v1/             versioned REST + webhook endpoints for connected apps
+src/app/api/search/         internal global search endpoint
+src/components/shell/       sidebar, topbar, global search, property selector
+src/components/dashboard/   KPI cards, app status grid, data flow visualization
+src/components/ui/          shared primitives (DataTable, EmptyState, StatusBadge, …)
+src/lib/                    Supabase clients, types, permissions, formatting helpers
 ```
 
-## Extending it later
+## Roadmap beyond V1
 
-A few natural next additions, whenever you want them: recurring tasks, email/WhatsApp notification reminders for due dates, a simple invoicing view for freelance work, or pulling live numbers from your existing Booking/F&B apps into the Hotel Ops summary tiles. The data model (`src/lib/types.ts`) is intentionally small so any of these are incremental changes, not rewrites.
+The schema and permission model already have room for Pixel Diving, Pixel POS,
+Pixel B2B (agent portal) and Pixel AI — those tables and event types exist, but
+their dedicated frontends are intentionally out of scope for V1. Add them
+incrementally without restructuring what's here.
