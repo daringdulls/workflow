@@ -28,6 +28,17 @@ function arg(name: string, fallback?: string) {
   return fallback;
 }
 
+// Some Windows shell/npm combinations strip "--flag" tokens before they
+// reach this script, leaving only the bare values. Fall back to reading
+// email/password positionally (an "@"-containing arg, and the next
+// non-flag arg) so the command still works either way.
+function positionalFallback(): { email?: string; password?: string } {
+  const positional = args.filter((a) => !a.startsWith("--"));
+  const email = positional.find((a) => a.includes("@"));
+  const password = positional.find((a) => a !== email);
+  return { email, password };
+}
+
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -36,8 +47,9 @@ if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
   process.exit(1);
 }
 
-const adminEmail = arg("email");
-const adminPassword = arg("password");
+const fallback = positionalFallback();
+const adminEmail = arg("email", fallback.email);
+const adminPassword = arg("password", fallback.password);
 
 if (!adminEmail || !adminPassword) {
   console.error('Usage: npm run seed -- --email you@example.com --password "SomeStrongPass123!"');
