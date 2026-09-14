@@ -10,8 +10,16 @@
  * Usage:
  *   npm run seed -- --email you@example.com --password "SomeStrongPass123!"
  */
-import "dotenv/config";
+import { config as loadEnv } from "dotenv";
+import path from "path";
 import { createClient } from "@supabase/supabase-js";
+
+// dotenv/config only auto-loads a file literally named ".env" — this project
+// (like Next.js itself) keeps secrets in ".env.local", so load that
+// explicitly. Falling back to ".env" afterwards is harmless: dotenv never
+// overwrites a variable that's already set.
+loadEnv({ path: path.resolve(process.cwd(), ".env.local") });
+loadEnv();
 
 const args = process.argv.slice(2);
 function arg(name: string, fallback?: string) {
