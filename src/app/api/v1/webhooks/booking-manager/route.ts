@@ -20,6 +20,10 @@ const payloadSchema = z.object({
   source_record_id: z.string().min(1),
   organization_slug: z.string().min(1),
   property_code: z.string().min(1),
+  // When property_code doesn't match an existing property, it's auto-created
+  // using this as its display name (so a source that books many hotels —
+  // not just this org's own properties — doesn't need them pre-created).
+  property_name: z.string().optional().nullable(),
   guest: guestSchema,
   arrival_date: z.string(),
   departure_date: z.string(),
@@ -64,13 +68,37 @@ export async function POST(request: NextRequest) {
   }
 
   const { data: org } = await supabase.from("organizations").select("id").eq("slug", body.organization_slug).maybeSingle();
-  const { data: property } = org
-    ? await supabase.from("properties").select("id").eq("organization_id", org.id).eq("code", body.property_code).maybeSingle()
-    : { data: null };
+  if (!org) {
+    await logSyncFailure(supabase, startedAt, "Unknown organization_slug");
+    return NextResponse.json({ error: "Unknown organization_slug" }, { status: 422 });
+  }
 
-  if (!org || !property) {
-    await logSyncFailure(supabase, startedAt, "Unknown organization_slug or property_code");
-    return NextResponse.json({ error: "Unknown organization_slug or property_code" }, { status: 422 });
+  let property = await supabase.from("properties").select("id").eq("organization_id", org.id).eq("code", body.property_code).maybeSingle().then((r) => r.data);
+
+  if (!property) {
+    if (!body.property_name) {
+      await logSyncFailure(supabase, startedAt, `Unknown property_code "${body.property_code}" and no property_name to auto-create it`);
+      return NextResponse.json({ error: `Unknown property_code "${body.property_code}"` }, { status: 422 });
+    }
+    const { data: newProperty, error: propertyError } = await supabase
+      .from("properties")
+      .insert({ organization_id: org.id, name: body.property_name, code: body.property_code, currency: body.currency })
+      .select("id")
+      .single();
+    if (propertyError) {
+      await logSyncFailure(supabase, startedAt, propertyError.message);
+      return NextResponse.json({ error: propertyError.message }, { status: 500 });
+    }
+    property = newProperty;
+    await supabase.from("events").insert({
+      event_type: "PROPERTY_CREATED",
+      source_app: "booking_manager",
+      entity_type: "property",
+      entity_id: property.id,
+      payload: { name: body.property_name, code: body.property_code },
+      status: "completed",
+      processed_at: new Date().toISOString(),
+    });
   }
 
   // Find or create the guest (dedupe by email or phone within the org).
