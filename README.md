@@ -94,6 +94,14 @@ Sign in at `http://localhost:3000/login` with the credentials the seed script pr
   Reservations from Pixel Booking Manager are upserted by `(source_app, source_record_id)`
   so re-delivery never creates duplicates — Pixel Core never becomes a second
   booking-entry system.
+- **Relay to Pixel Stay PMS**: every reservation Pixel Booking Manager sends in is
+  also forwarded to Pixel Stay PMS's `/api/webhooks/pixel-core` endpoint (see
+  `PMS_WEBHOOK_URL`/`PMS_WEBHOOK_SECRET` above), so the matching room is blocked
+  there automatically. Matching is by property/room-type **code** — set the same
+  code on both sides (Pixel Core's Properties/Room Types module, and PMS's
+  Settings → Property / Rooms). A PMS outage never fails the Booking Manager
+  webhook; the relay's own success/failure only shows up in Sync Monitor
+  (app_key `pms`).
 - **Outbound**: every meaningful change writes a row to `events` (see
   `Integrations → Event Logs`), which is how other Pixel apps eventually pull or
   get pushed the slice of data relevant to them.

@@ -211,6 +211,12 @@ export async function POST(request: NextRequest) {
     details: { booking_number: reservation.booking_number, event_type: eventType },
   });
 
+  // Relay onward to Pixel Stay PMS so the room is blocked there too. Never
+  // lets a PMS outage fail this webhook — Booking Manager's write to Pixel
+  // Core already succeeded above; the relay result only shows up in Sync
+  // Monitor (app_key "pms").
+  await relayToPms(supabase, body);
+
   return NextResponse.json({ ok: true, reservation_id: reservation.id, booking_number: reservation.booking_number, event: eventType });
 }
 
@@ -226,4 +232,63 @@ async function logSyncFailure(supabase: ReturnType<typeof createServiceClient>, 
     status: "error",
     details: { error: String(error) },
   });
+}
+
+async function relayToPms(supabase: ReturnType<typeof createServiceClient>, body: z.infer<typeof payloadSchema>) {
+  const url = process.env.PMS_WEBHOOK_URL;
+  const secret = process.env.PMS_WEBHOOK_SECRET;
+  if (!url || !secret) return; // Not connected yet — nothing to relay to.
+
+  const startedAt = new Date().toISOString();
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-pixel-secret": secret },
+      body: JSON.stringify({
+        source_record_id: body.source_record_id,
+        property_code: body.property_code,
+        room_type_code: body.room_type_code ?? null,
+        guest: {
+          first_name: body.guest.first_name,
+          last_name: body.guest.last_name,
+          email: body.guest.email ?? null,
+          phone: body.guest.phone ?? null,
+        },
+        arrival_date: body.arrival_date,
+        departure_date: body.departure_date,
+        adults: body.adults,
+        children: body.children,
+        num_rooms: body.num_rooms,
+        booking_status: body.booking_status,
+      }),
+    });
+    const responseBody = await res.json().catch(() => ({}));
+
+    await supabase
+      .from("app_connections")
+      .update({ status: res.ok ? "connected" : "error", last_sync_at: new Date().toISOString() })
+      .eq("app_key", "pms");
+    await supabase.from("sync_logs").insert({
+      app_key: "pms",
+      started_at: startedAt,
+      finished_at: new Date().toISOString(),
+      records_received: 0,
+      records_sent: res.ok ? 1 : 0,
+      failed_records: res.ok ? 0 : 1,
+      status: res.ok ? "synced" : "error",
+      details: { source_record_id: body.source_record_id, response: responseBody },
+    });
+  } catch (err) {
+    await supabase.from("app_connections").update({ status: "error" }).eq("app_key", "pms");
+    await supabase.from("sync_logs").insert({
+      app_key: "pms",
+      started_at: startedAt,
+      finished_at: new Date().toISOString(),
+      records_received: 0,
+      records_sent: 0,
+      failed_records: 1,
+      status: "error",
+      details: { source_record_id: body.source_record_id, error: String(err) },
+    });
+  }
 }
