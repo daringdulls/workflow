@@ -6,8 +6,8 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { APP_CONNECTION_TONE, SYNC_STATUS_TONE } from "@/lib/status-styles";
 import { formatDateTime, timeAgo, titleCase } from "@/lib/format";
-import { History } from "lucide-react";
-import { setConnectionStatus } from "../actions";
+import { History, ExternalLink } from "lucide-react";
+import { setConnectionStatus, setAppUrl } from "../actions";
 
 export default async function AppConnectionDetailPage({ params }: { params: { appKey: string } }) {
   const supabase = createClient();
@@ -25,8 +25,38 @@ export default async function AppConnectionDetailPage({ params }: { params: { ap
       <PageHeader
         title={app.app_name}
         description={app.description ?? undefined}
-        actions={<StatusBadge status={app.status} tone={APP_CONNECTION_TONE[app.status]} />}
+        actions={
+          <div className="flex items-center gap-2">
+            {app.app_url && (
+              <a href={app.app_url} target="_blank" rel="noopener noreferrer" className="btn-secondary flex items-center gap-1.5">
+                Open App <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+            )}
+            <StatusBadge status={app.status} tone={APP_CONNECTION_TONE[app.status]} />
+          </div>
+        }
       />
+
+      {canManage && (
+        <div className="card p-5">
+          <p className="mb-2 text-sm font-semibold text-navy-900">Live App URL</p>
+          <form action={setAppUrl.bind(null, app.app_key)} className="flex flex-wrap items-center gap-2">
+            <input
+              type="url"
+              name="app_url"
+              defaultValue={app.app_url ?? ""}
+              placeholder="https://your-app.vercel.app"
+              className="input flex-1 min-w-[240px]"
+            />
+            <button type="submit" className="btn-secondary">
+              Save
+            </button>
+          </form>
+          <p className="mt-2 text-xs text-slate-400">
+            Where this app is actually deployed. Set it once to get the &quot;Open App&quot; shortcut above.
+          </p>
+        </div>
+      )}
 
       <div className="card grid grid-cols-2 gap-4 p-5 sm:grid-cols-3">
         <Info label="App key" value={app.app_key} />

@@ -351,6 +351,7 @@ export interface AppConnection {
   app_name: string;
   description: string | null;
   api_endpoint: string | null;
+  app_url: string | null;
   status: AppConnectionStatus;
   is_primary_source: boolean;
   last_sync_at: string | null;
